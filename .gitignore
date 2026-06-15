@@ -1,0 +1,18 @@
+# Sauvegardes locales / temporaires
+_backup_v1/
+_backup*/
+*.tmp
+*.new
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (si scripts ajoutés plus tard)
+__pycache__/
+*.pyc
+
+# Éditeurs
+.vscode/
+.idea/
