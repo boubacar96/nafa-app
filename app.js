@@ -8,7 +8,7 @@
 
   /* ---------------- IndexedDB (mini wrapper) ---------------- */
   const DB_NAME = 'nafa';
-  const DB_VERSION = 2;
+  const DB_VERSION = 3;
   let db = null;
 
   function openDB() {
@@ -28,6 +28,9 @@
         }
         if (!d.objectStoreNames.contains('budgets')) {
           d.createObjectStore('budgets', { keyPath: 'categoryId' });
+        }
+        if (!d.objectStoreNames.contains('recurrents')) {
+          d.createObjectStore('recurrents', { keyPath: 'id' });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -86,6 +89,7 @@
     categories: [],
     operations: [],
     budgets: [],
+    recurrents: [],
     addType: 'expense',
     addCatId: null,
     histPeriod: 'month',
@@ -125,6 +129,26 @@
   }
   function catById(id) { return state.categories.find((c) => c.id === id); }
   function budgetFor(catId) { return state.budgets.find((b) => b.categoryId === catId); }
+  function recurrentById(id) { return state.recurrents.find((r) => r.id === id); }
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  function daysInMonth(mk) {
+    const [y, m] = mk.split('-').map(Number);
+    return new Date(y, m, 0).getDate();
+  }
+  // Jour effectif d'une récurrence ce mois-ci (ex. 31 → 30 en juin)
+  function effectiveDay(r, mk) { return Math.min(r.day, daysInMonth(mk)); }
+
+  // Récurrences en attente de confirmation pour le mois en cours
+  function pendingRecurrents() {
+    const mk = currentMonthKey();
+    const today = Number(todayISO().slice(8, 10));
+    return state.recurrents.filter((r) =>
+      r.active !== false &&
+      !(r.posted || []).includes(mk) &&
+      today >= effectiveDay(r, mk)
+    );
+  }
 
   // Dépensé par catégorie pour le mois en cours
   function spentMap() {
@@ -179,12 +203,76 @@
     $('#home-solde').textContent = fmt(solde);
     $('#home-saving').textContent = fmt(Math.max(solde, 0));
 
+    renderHomePending();
     renderHomeBudgets();
 
     const recent = [...state.operations]
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt))
       .slice(0, 5);
     renderOpList($('#home-recent'), recent, false);
+  }
+
+  // Carte "À confirmer ce mois" : récurrences dont le jour est arrivé
+  function renderHomePending() {
+    const wrap = $('#home-pending');
+    const list = $('#home-pending-list');
+    const pend = pendingRecurrents();
+    if (!pend.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    list.innerHTML = '';
+    pend.forEach((r) => {
+      const c = catById(r.categoryId);
+      const div = document.createElement('div');
+      div.className = 'pending';
+      div.innerHTML = `
+        <div class="pending__top">
+          <span class="pending__cat"><span class="bgt__emoji" style="background:${(c?.color || '#999')}1f">${c?.icon || '🔁'}</span>${escapeHtml(r.label)}</span>
+          <span class="pending__type pending__type--${r.type}">${r.type === 'income' ? 'Revenu' : 'Dépense'}</span>
+        </div>
+        <div class="pending__action">
+          <label class="pending__amount">
+            <input inputmode="numeric" pattern="[0-9 ]*" value="${r.amount.toLocaleString('fr-FR')}" data-recur-amount="${r.id}" />
+            <span>FCFA</span>
+          </label>
+          <button class="btn btn--primary pending__confirm" data-recur-confirm="${r.id}">Confirmer</button>
+        </div>
+        <button class="pending__skip" data-recur-skip="${r.id}">Ignorer ce mois</button>`;
+      list.appendChild(div);
+    });
+  }
+
+  async function confirmRecurrent(id) {
+    const r = recurrentById(id);
+    if (!r) return;
+    const mk = currentMonthKey();
+    const input = document.querySelector(`[data-recur-amount="${id}"]`);
+    const amount = input ? parseAmount(input.value) : r.amount;
+    if (amount <= 0) return toast('Montant invalide');
+    const day = effectiveDay(r, mk);
+    const op = {
+      id: uid(),
+      amount,
+      categoryId: r.categoryId,
+      type: r.type,
+      date: `${mk}-${pad2(day)}`,
+      note: r.label,
+      createdAt: new Date().toISOString(),
+    };
+    await put('operations', op);
+    state.operations.push(op);
+    r.posted = [...(r.posted || []), mk];
+    await put('recurrents', r);
+    toast(r.type === 'income' ? 'Revenu ajouté ✓' : 'Charge ajoutée ✓');
+    renderHome();
+  }
+
+  async function skipRecurrent(id) {
+    const r = recurrentById(id);
+    if (!r) return;
+    r.posted = [...(r.posted || []), currentMonthKey()];
+    await put('recurrents', r);
+    toast('Ignoré ce mois');
+    renderHome();
   }
 
   // Aperçu des budgets sur l'accueil (les plus "chauds" d'abord) + alertes
@@ -519,8 +607,96 @@
     toast('Budget retiré');
   }
 
+  /* ---------------- Réglages : récurrences ---------------- */
+  function renderRecurrents() {
+    const ul = $('#recur-list');
+    ul.innerHTML = '';
+    if (!state.recurrents.length) {
+      ul.innerHTML = '<li class="hint" style="margin:0 2px">Aucune récurrence. Ajoute ton loyer, ton salaire, tes abonnements…</li>';
+      return;
+    }
+    [...state.recurrents]
+      .sort((a, b) => a.day - b.day)
+      .forEach((r) => {
+        const c = catById(r.categoryId);
+        const li = document.createElement('li');
+        li.className = 'recur-row';
+        li.innerHTML = `
+          <span class="bgt__emoji" style="background:${(c?.color || '#999')}1f">${c?.icon || '🔁'}</span>
+          <span class="recur-row__main">
+            <span class="recur-row__label">${escapeHtml(r.label)}</span>
+            <span class="recur-row__meta">${r.type === 'income' ? '＋' : '－'} ${fmt(r.amount)} · le ${r.day} du mois</span>
+          </span>
+          <button class="cat-row__btn edit" title="Modifier">✏️</button>
+          <button class="cat-row__btn del" title="Supprimer">🗑️</button>`;
+        li.querySelector('.edit').addEventListener('click', () => openRecurModal(r));
+        li.querySelector('.del').addEventListener('click', () => removeRecurrent(r));
+        ul.appendChild(li);
+      });
+  }
+
+  function fillRecurCatSelect(type, selectedId) {
+    const sel = $('#recur-modal-cat');
+    sel.innerHTML = state.categories
+      .filter((c) => c.type === type)
+      .map((c) => `<option value="${c.id}">${c.icon} ${escapeHtml(c.name)}</option>`)
+      .join('');
+    if (selectedId) sel.value = selectedId;
+  }
+
+  function openRecurModal(r) {
+    $('#recur-modal-id').value = r ? r.id : '';
+    $('#recur-modal-title').textContent = r ? 'Modifier la récurrence' : 'Nouvelle récurrence';
+    $('#recur-modal-label').value = r ? r.label : '';
+    $('#recur-modal-amount').value = r ? r.amount.toLocaleString('fr-FR') : '';
+    $('#recur-modal-day').value = r ? r.day : 1;
+    const type = r ? r.type : 'expense';
+    $('#recur-modal-type').value = type;
+    fillRecurCatSelect(type, r ? r.categoryId : null);
+    $('#recur-modal-remove').hidden = !r;
+    $('#recur-modal').hidden = false;
+  }
+  function closeRecurModal() { $('#recur-modal').hidden = true; }
+
+  async function saveRecur() {
+    const label = $('#recur-modal-label').value.trim();
+    const amount = parseAmount($('#recur-modal-amount').value);
+    let day = parseInt($('#recur-modal-day').value, 10);
+    if (!label) return toast('Donne un libellé');
+    if (amount <= 0) return toast('Entre un montant');
+    if (isNaN(day) || day < 1) day = 1;
+    if (day > 31) day = 31;
+    const id = $('#recur-modal-id').value || uid();
+    const existing = recurrentById(id);
+    const rec = {
+      id,
+      label,
+      amount,
+      day,
+      type: $('#recur-modal-type').value,
+      categoryId: $('#recur-modal-cat').value,
+      active: true,
+      posted: existing ? (existing.posted || []) : [],
+    };
+    await put('recurrents', rec);
+    if (existing) Object.assign(existing, rec);
+    else state.recurrents.push(rec);
+    closeRecurModal();
+    renderRecurrents();
+    toast('Récurrence enregistrée ✓');
+  }
+
+  async function removeRecurrent(r) {
+    if (!confirm(`Supprimer la récurrence « ${r.label} » ?`)) return;
+    await del('recurrents', r.id);
+    state.recurrents = state.recurrents.filter((x) => x.id !== r.id);
+    renderRecurrents();
+    toast('Récurrence supprimée');
+  }
+
   /* ---------------- Réglages : catégories ---------------- */
   function renderSettings() {
+    renderRecurrents();
     ['expense', 'income'].forEach((type) => {
       const ul = $(`#cat-list-${type}`);
       ul.innerHTML = '';
@@ -618,6 +794,34 @@
       const n = parseAmount(e.target.value);
       e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
     });
+
+    // récurrences
+    $('#add-recur-btn').addEventListener('click', () => openRecurModal(null));
+    $('#recur-modal-save').addEventListener('click', saveRecur);
+    $('#recur-modal-remove').addEventListener('click', () => {
+      const r = recurrentById($('#recur-modal-id').value);
+      if (r) { closeRecurModal(); removeRecurrent(r); }
+    });
+    $$('[data-close-recur]').forEach((b) => b.addEventListener('click', closeRecurModal));
+    $('#recur-modal-type').addEventListener('change', (e) => fillRecurCatSelect(e.target.value));
+    $('#recur-modal-amount').addEventListener('input', (e) => {
+      const n = parseAmount(e.target.value);
+      e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+    });
+
+    // carte "à confirmer" (délégation)
+    $('#home-pending-list').addEventListener('click', (e) => {
+      const c = e.target.closest('[data-recur-confirm]');
+      const s = e.target.closest('[data-recur-skip]');
+      if (c) confirmRecurrent(c.dataset.recurConfirm);
+      else if (s) skipRecurrent(s.dataset.recurSkip);
+    });
+    $('#home-pending-list').addEventListener('input', (e) => {
+      if (e.target.matches('[data-recur-amount]')) {
+        const n = parseAmount(e.target.value);
+        e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+      }
+    });
   }
 
   /* ---------------- Démarrage ---------------- */
@@ -632,6 +836,7 @@
     state.categories = cats;
     state.operations = await getAll('operations');
     state.budgets = await getAll('budgets');
+    state.recurrents = await getAll('recurrents');
 
     // période historique par défaut = mois
     $$('[data-period]').forEach((x) => x.classList.toggle('is-active', x.dataset.period === 'month'));

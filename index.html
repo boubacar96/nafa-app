@@ -53,6 +53,13 @@
         </div>
       </div>
 
+      <div class="home-pending" id="home-pending" hidden>
+        <div class="section-head">
+          <h2>À confirmer ce mois</h2>
+        </div>
+        <div id="home-pending-list"></div>
+      </div>
+
       <div class="home-budgets" id="home-budgets" hidden>
         <div class="section-head">
           <h2>Mes budgets</h2>
@@ -153,6 +160,11 @@
         <h1 class="app-header__title">Réglages</h1>
       </header>
 
+      <div class="section-head"><h2>Charges fixes &amp; revenus récurrents</h2></div>
+      <p class="hint">Loyer, salaire, abonnements… Définis-les une fois&nbsp;: chaque mois, dès le jour venu, l'app te les proposera sur l'accueil — tu confirmes (ou ajustes le montant).</p>
+      <ul class="recur-list" id="recur-list"></ul>
+      <button class="btn btn--ghost full" id="add-recur-btn">+ Nouvelle récurrence</button>
+
       <div class="section-head"><h2>Catégories</h2></div>
       <p class="hint">Ajoute, renomme ou supprime tes catégories de dépenses et de revenus.</p>
 
@@ -237,6 +249,47 @@
         <button type="button" class="btn btn--ghost danger" id="budget-modal-remove" hidden>Retirer</button>
         <button type="button" class="btn btn--ghost" data-close-budget>Annuler</button>
         <button type="button" class="btn btn--primary" id="budget-modal-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== Modale récurrence ====================== -->
+  <div class="modal" id="recur-modal" hidden>
+    <div class="modal__backdrop" data-close-recur></div>
+    <div class="modal__card">
+      <h3 id="recur-modal-title">Nouvelle récurrence</h3>
+      <input type="hidden" id="recur-modal-id" />
+      <label class="field">
+        <span class="field-label">Libellé</span>
+        <input type="text" id="recur-modal-label" maxlength="40" placeholder="ex. Loyer, Salaire, Internet…" />
+      </label>
+      <div class="row-fields">
+        <label class="field">
+          <span class="field-label">Type</span>
+          <select id="recur-modal-type" class="select">
+            <option value="expense">Dépense</option>
+            <option value="income">Revenu</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Catégorie</span>
+          <select id="recur-modal-cat" class="select"></select>
+        </label>
+      </div>
+      <div class="row-fields">
+        <label class="field">
+          <span class="field-label">Montant (FCFA)</span>
+          <input id="recur-modal-amount" inputmode="numeric" pattern="[0-9 ]*" placeholder="0" />
+        </label>
+        <label class="field">
+          <span class="field-label">Jour du mois</span>
+          <input id="recur-modal-day" type="number" min="1" max="31" placeholder="5" />
+        </label>
+      </div>
+      <div class="add-actions">
+        <button type="button" class="btn btn--ghost danger" id="recur-modal-remove" hidden>Supprimer</button>
+        <button type="button" class="btn btn--ghost" data-close-recur>Annuler</button>
+        <button type="button" class="btn btn--primary" id="recur-modal-save">Enregistrer</button>
       </div>
     </div>
   </div>

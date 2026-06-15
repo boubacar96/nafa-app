@@ -187,6 +187,37 @@ button{font-family:inherit;cursor:pointer}
 .cat-row__btn{background:none;border:none;font-size:1.05rem;padding:5px 6px;color:var(--muted)}
 .cat-row__btn.del{color:var(--out)}
 
+/* ---------- "À confirmer ce mois" ---------- */
+.home-pending{margin-bottom:8px}
+.pending{
+  background:var(--card);border:1px solid #d7e7e1;border-radius:18px;padding:14px 15px;
+  box-shadow:var(--shadow-soft);margin-bottom:10px;position:relative;
+  border-left:4px solid var(--teal);
+}
+.pending__top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+.pending__cat{display:flex;align-items:center;gap:9px;font-weight:800;font-size:.98rem;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pending__type{font-size:.7rem;font-weight:800;padding:3px 9px;border-radius:20px;flex:0 0 auto;text-transform:uppercase;letter-spacing:.03em}
+.pending__type--expense{background:#fbe7ea;color:var(--out)}
+.pending__type--income{background:#e1f5ee;color:var(--in)}
+.pending__action{display:flex;gap:10px;align-items:stretch}
+.pending__amount{flex:1;display:flex;align-items:center;gap:6px;background:#f3f6f4;
+  border:1px solid var(--line);border-radius:13px;padding:0 13px}
+.pending__amount input{border:none;background:transparent;outline:none;font-size:1.05rem;
+  font-weight:800;width:100%;color:var(--ink);font-family:inherit;padding:11px 0}
+.pending__amount span{color:var(--muted);font-weight:700;font-size:.82rem}
+.pending__confirm{flex:0 0 auto;padding:12px 18px}
+.pending__skip{background:none;border:none;color:var(--muted);font-size:.8rem;font-weight:600;
+  margin-top:9px;padding:2px;text-decoration:underline}
+
+/* ---------- Réglages : récurrences ---------- */
+.recur-list{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:7px}
+.recur-row{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:10px 13px;box-shadow:var(--shadow-soft)}
+.recur-row__main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.recur-row__label{font-weight:700;font-size:.95rem}
+.recur-row__meta{color:var(--muted);font-size:.8rem}
+
 /* ---------- Budgets : barres ---------- */
 .bar{height:9px;border-radius:6px;background:#e7ece9;overflow:hidden}
 .bar--light{background:rgba(255,255,255,.5)}
