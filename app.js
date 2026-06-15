@@ -8,7 +8,7 @@
 
   /* ---------------- IndexedDB (mini wrapper) ---------------- */
   const DB_NAME = 'nafa';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   let db = null;
 
   function openDB() {
@@ -25,6 +25,9 @@
         }
         if (!d.objectStoreNames.contains('settings')) {
           d.createObjectStore('settings', { keyPath: 'key' });
+        }
+        if (!d.objectStoreNames.contains('budgets')) {
+          d.createObjectStore('budgets', { keyPath: 'categoryId' });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -82,6 +85,7 @@
   const state = {
     categories: [],
     operations: [],
+    budgets: [],
     addType: 'expense',
     addCatId: null,
     histPeriod: 'month',
@@ -120,6 +124,27 @@
     return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()].toLowerCase()}`;
   }
   function catById(id) { return state.categories.find((c) => c.id === id); }
+  function budgetFor(catId) { return state.budgets.find((b) => b.categoryId === catId); }
+
+  // Dépensé par catégorie pour le mois en cours
+  function spentMap() {
+    const mk = currentMonthKey();
+    const m = {};
+    state.operations
+      .filter((o) => o.type === 'expense' && monthKey(o.date) === mk)
+      .forEach((o) => { m[o.categoryId] = (m[o.categoryId] || 0) + o.amount; });
+    return m;
+  }
+
+  // Statut d'un budget : pourcentage, couleur (ok / proche / dépassé), reste
+  function budgetStatus(spent, limit) {
+    const ratio = limit > 0 ? spent / limit : 0;
+    const pct = Math.min(100, Math.round(ratio * 100));
+    let level = 'ok';
+    if (ratio >= 1) level = 'over';
+    else if (ratio >= 0.8) level = 'warn';
+    return { pct, level, ratio, remaining: limit - spent, over: spent - limit };
+  }
 
   function toast(msg) {
     const t = $('#toast');
@@ -135,6 +160,7 @@
     window.scrollTo(0, 0);
     if (screen === 'home') renderHome();
     if (screen === 'history') renderHistory();
+    if (screen === 'budgets') renderBudgets();
     if (screen === 'settings') renderSettings();
     if (screen === 'add' && !$('#add-id').value) resetAddForm();
   }
@@ -153,10 +179,64 @@
     $('#home-solde').textContent = fmt(solde);
     $('#home-saving').textContent = fmt(Math.max(solde, 0));
 
+    renderHomeBudgets();
+
     const recent = [...state.operations]
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt))
       .slice(0, 5);
     renderOpList($('#home-recent'), recent, false);
+  }
+
+  // Aperçu des budgets sur l'accueil (les plus "chauds" d'abord) + alertes
+  function renderHomeBudgets() {
+    const wrap = $('#home-budgets');
+    const list = $('#home-budgets-list');
+    const alertBox = $('#home-budget-alert');
+    if (!state.budgets.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    const spent = spentMap();
+
+    const rows = state.budgets
+      .map((b) => ({ cat: catById(b.categoryId), limit: b.limit, spent: spent[b.categoryId] || 0 }))
+      .filter((r) => r.cat)
+      .map((r) => ({ ...r, st: budgetStatus(r.spent, r.limit) }))
+      .sort((a, b) => b.st.ratio - a.st.ratio);
+
+    // alertes : budgets à 80%+ ce mois
+    const hot = rows.filter((r) => r.st.level !== 'ok');
+    if (hot.length) {
+      const over = hot.filter((r) => r.st.level === 'over').length;
+      alertBox.hidden = false;
+      alertBox.textContent = over
+        ? `⚠️ ${over} budget${over > 1 ? 's' : ''} dépassé${over > 1 ? 's' : ''} ce mois`
+        : `⚠️ ${hot.length} budget${hot.length > 1 ? 's' : ''} bientôt atteint${hot.length > 1 ? 's' : ''}`;
+    } else {
+      alertBox.hidden = true;
+    }
+
+    list.innerHTML = '';
+    rows.slice(0, 4).forEach((r) => list.appendChild(budgetBar(r, true)));
+  }
+
+  // Construit une ligne "barre de budget" (compacte pour l'accueil, complète pour l'écran Budgets)
+  function budgetBar(r, compact) {
+    const li = document.createElement(compact ? 'div' : 'li');
+    li.className = 'bgt' + (compact ? ' bgt--compact' : '');
+    const right = r.st.level === 'over'
+      ? `<span class="bgt__over">Dépassé de ${fmt(r.st.over)}</span>`
+      : `<span class="bgt__rest">Reste ${fmt(Math.max(0, r.st.remaining))}</span>`;
+    li.innerHTML = `
+      <div class="bgt__head">
+        <span class="bgt__cat"><span class="bgt__emoji" style="background:${r.cat.color}1f">${r.cat.icon}</span>${escapeHtml(r.cat.name)}</span>
+        <span class="bgt__nums">${fmt(r.spent)} <span class="bgt__lim">/ ${fmt(r.limit)}</span></span>
+      </div>
+      <div class="bar"><div class="bar__fill bar__fill--${r.st.level}" style="width:${r.st.pct}%"></div></div>
+      <div class="bgt__foot">${right}</div>`;
+    if (!compact) {
+      li.classList.add('tappable');
+      li.addEventListener('click', () => openBudgetModal(r.cat));
+    }
+    return li;
   }
 
   /* ---------------- Liste d'opérations ---------------- */
@@ -343,6 +423,102 @@
     renderOpList($('#history-list'), ops, true);
   }
 
+  /* ---------------- Écran Budgets ---------------- */
+  function renderBudgets() {
+    const spent = spentMap();
+    const expCats = state.categories.filter((c) => c.type === 'expense');
+    const budgeted = expCats
+      .filter((c) => budgetFor(c.id))
+      .map((c) => ({ cat: c, limit: budgetFor(c.id).limit, spent: spent[c.id] || 0 }))
+      .map((r) => ({ ...r, st: budgetStatus(r.spent, r.limit) }))
+      .sort((a, b) => b.st.ratio - a.st.ratio);
+    const unbudgeted = expCats.filter((c) => !budgetFor(c.id));
+
+    // Résumé
+    const totalLimit = budgeted.reduce((s, r) => s + r.limit, 0);
+    const totalSpent = budgeted.reduce((s, r) => s + r.spent, 0);
+    const summary = $('#budget-summary');
+    if (budgeted.length) {
+      const st = budgetStatus(totalSpent, totalLimit);
+      summary.hidden = false;
+      summary.innerHTML = `
+        <span class="budget-summary__label">Dépensé ce mois sur budgets fixés</span>
+        <span class="budget-summary__amount">${fmt(totalSpent)} <span class="budget-summary__lim">/ ${fmt(totalLimit)}</span></span>
+        <div class="bar bar--light"><div class="bar__fill bar__fill--${st.level}" style="width:${st.pct}%"></div></div>`;
+    } else {
+      summary.hidden = true;
+    }
+
+    // Liste
+    const list = $('#budget-list');
+    list.innerHTML = '';
+
+    if (budgeted.length) {
+      const h = document.createElement('li');
+      h.className = 'budget-sub';
+      h.textContent = 'Budgets fixés';
+      list.appendChild(h);
+      budgeted.forEach((r) => list.appendChild(budgetBar(r, false)));
+    }
+
+    const h2 = document.createElement('li');
+    h2.className = 'budget-sub';
+    h2.textContent = budgeted.length ? 'Ajouter un budget' : 'Choisis une catégorie à plafonner';
+    list.appendChild(h2);
+
+    if (!unbudgeted.length) {
+      const e = document.createElement('li');
+      e.className = 'hint';
+      e.style.margin = '0 2px';
+      e.textContent = 'Toutes tes catégories de dépense ont déjà un budget 👍';
+      list.appendChild(e);
+    }
+    unbudgeted.forEach((c) => {
+      const li = document.createElement('li');
+      li.className = 'budget-add-row tappable';
+      li.innerHTML = `
+        <span class="bgt__emoji" style="background:${c.color}1f">${c.icon}</span>
+        <span class="budget-add-row__name">${escapeHtml(c.name)}</span>
+        <span class="budget-add-row__cta">Définir +</span>`;
+      li.addEventListener('click', () => openBudgetModal(c));
+      list.appendChild(li);
+    });
+  }
+
+  function openBudgetModal(cat) {
+    const b = budgetFor(cat.id);
+    $('#budget-modal-cat').value = cat.id;
+    $('#budget-modal-title').textContent = `Budget — ${cat.name}`;
+    $('#budget-modal-amount').value = b ? b.limit.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+    $('#budget-modal-remove').hidden = !b;
+    $('#budget-modal').hidden = false;
+    setTimeout(() => $('#budget-modal-amount').focus(), 50);
+  }
+  function closeBudgetModal() { $('#budget-modal').hidden = true; }
+
+  async function saveBudget() {
+    const catId = $('#budget-modal-cat').value;
+    const limit = parseAmount($('#budget-modal-amount').value);
+    if (limit <= 0) return toast('Entre une limite');
+    const bgt = { categoryId: catId, limit };
+    await put('budgets', bgt);
+    const existing = budgetFor(catId);
+    if (existing) existing.limit = limit;
+    else state.budgets.push(bgt);
+    closeBudgetModal();
+    renderBudgets();
+    toast('Budget enregistré ✓');
+  }
+
+  async function removeBudget() {
+    const catId = $('#budget-modal-cat').value;
+    await del('budgets', catId);
+    state.budgets = state.budgets.filter((b) => b.categoryId !== catId);
+    closeBudgetModal();
+    renderBudgets();
+    toast('Budget retiré');
+  }
+
   /* ---------------- Réglages : catégories ---------------- */
   function renderSettings() {
     ['expense', 'income'].forEach((type) => {
@@ -433,6 +609,15 @@
     $('#add-cat-btn').addEventListener('click', () => openCatModal(null));
     $('#cat-modal-save').addEventListener('click', saveCatModal);
     $$('[data-close-modal]').forEach((b) => b.addEventListener('click', closeCatModal));
+
+    // budgets
+    $('#budget-modal-save').addEventListener('click', saveBudget);
+    $('#budget-modal-remove').addEventListener('click', removeBudget);
+    $$('[data-close-budget]').forEach((b) => b.addEventListener('click', closeBudgetModal));
+    $('#budget-modal-amount').addEventListener('input', (e) => {
+      const n = parseAmount(e.target.value);
+      e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+    });
   }
 
   /* ---------------- Démarrage ---------------- */
@@ -446,6 +631,7 @@
     cats.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     state.categories = cats;
     state.operations = await getAll('operations');
+    state.budgets = await getAll('budgets');
 
     // période historique par défaut = mois
     $$('[data-period]').forEach((x) => x.classList.toggle('is-active', x.dataset.period === 'month'));

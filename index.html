@@ -53,6 +53,15 @@
         </div>
       </div>
 
+      <div class="home-budgets" id="home-budgets" hidden>
+        <div class="section-head">
+          <h2>Mes budgets</h2>
+          <button class="link-btn" data-goto="budgets">Gérer →</button>
+        </div>
+        <div class="budget-alert" id="home-budget-alert" hidden></div>
+        <div id="home-budgets-list"></div>
+      </div>
+
       <div class="section-head">
         <h2>Dernières opérations</h2>
         <button class="link-btn" data-goto="history">Tout voir →</button>
@@ -128,18 +137,14 @@
     <!-- ---------- Écran : Budgets (à venir) ---------- -->
     <section class="screen" id="screen-budgets" data-screen="budgets" hidden>
       <header class="app-header">
-        <h1 class="app-header__title">Budgets</h1>
+        <div>
+          <p class="app-header__kicker">Limites mensuelles</p>
+          <h1 class="app-header__title">Budgets</h1>
+        </div>
       </header>
-      <div class="coming">
-        <div class="coming__emoji">📊</div>
-        <h2 class="coming__title">Bientôt disponible</h2>
-        <p class="coming__text">
-          Fixe une limite par catégorie (ex. Transport&nbsp;50&nbsp;000&nbsp;FCFA/mois)
-          et reçois une alerte quand tu t'en approches&nbsp;: voyant orange à&nbsp;80&nbsp;%,
-          rouge au-delà. Tu verras d'un coup d'œil où tu en es.
-        </p>
-        <p class="coming__hint">C'est la prochaine étape qu'on construit ensemble.</p>
-      </div>
+      <p class="hint">Fixe une limite par catégorie. À 80&nbsp;% le voyant passe à l'orange, rouge si tu dépasses.</p>
+      <div class="budget-summary" id="budget-summary" hidden></div>
+      <ul class="budget-list" id="budget-list"></ul>
     </section>
 
     <!-- ---------- Écran : Réglages ---------- -->
@@ -213,6 +218,25 @@
       <div class="add-actions">
         <button type="button" class="btn btn--ghost" data-close-modal>Annuler</button>
         <button type="button" class="btn btn--primary" id="cat-modal-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== Modale budget ====================== -->
+  <div class="modal" id="budget-modal" hidden>
+    <div class="modal__backdrop" data-close-budget></div>
+    <div class="modal__card">
+      <h3 id="budget-modal-title">Budget</h3>
+      <input type="hidden" id="budget-modal-cat" />
+      <label class="amount-field" style="margin-bottom:14px">
+        <span class="amount-field__currency">FCFA</span>
+        <input id="budget-modal-amount" inputmode="numeric" pattern="[0-9 ]*" placeholder="0" />
+      </label>
+      <p class="hint" style="margin-bottom:6px">Limite de dépense pour ce mois sur cette catégorie.</p>
+      <div class="add-actions">
+        <button type="button" class="btn btn--ghost danger" id="budget-modal-remove" hidden>Retirer</button>
+        <button type="button" class="btn btn--ghost" data-close-budget>Annuler</button>
+        <button type="button" class="btn btn--primary" id="budget-modal-save">Enregistrer</button>
       </div>
     </div>
   </div>
