@@ -156,11 +156,16 @@
   function recurrentById(id) { return state.recurrents.find((r) => r.id === id); }
   function accountById(id) { return state.accounts.find((a) => a.id === id); }
 
-  // Solde courant d'un compte = solde de départ + revenus − dépenses (toutes périodes)
+  // Solde courant d'un compte = solde de départ + revenus − dépenses + transferts
   function accountBalance(id) {
     const acc = accountById(id);
     let bal = acc ? (acc.opening || 0) : 0;
     state.operations.forEach((o) => {
+      if (o.type === 'transfer') {
+        if (o.accountId === id) bal -= o.amount;       // compte source
+        if (o.toAccountId === id) bal += o.amount;      // compte destination
+        return;
+      }
       if (o.accountId !== id) return;
       bal += o.type === 'income' ? o.amount : -o.amount;
     });
@@ -466,19 +471,31 @@
 
   /* ---------------- Liste d'opérations ---------------- */
   function opRow(o) {
-    const c = catById(o.categoryId);
     const li = document.createElement('li');
     const btn = document.createElement('button');
     btn.className = 'op';
-    btn.innerHTML = `
-      <span class="op__icon" style="background:${(c?.color || '#999')}1f">${c?.icon || '❓'}</span>
-      <span class="op__main">
-        <span class="op__cat">${escapeHtml(c?.name || 'Sans catégorie')}</span>
-        <span class="op__note">${escapeHtml(o.note || '')}</span>
-      </span>
-      <span class="op__amount ${o.type === 'income' ? 'is-in' : 'is-out'}">
-        ${o.type === 'income' ? '+' : '–'} ${fmt(o.amount)}
-      </span>`;
+    if (o.type === 'transfer') {
+      const from = accountById(o.accountId), to = accountById(o.toAccountId);
+      btn.innerHTML = `
+        <span class="op__icon" style="background:var(--surface-2)">🔄</span>
+        <span class="op__main">
+          <span class="op__cat">Transfert</span>
+          <span class="op__note">${escapeHtml((from?.name || '?') + ' → ' + (to?.name || '?'))}${o.note ? ' · ' + escapeHtml(o.note) : ''}</span>
+        </span>
+        <span class="op__amount op__amount--neutral">⇄ ${fmt(o.amount)}</span>`;
+    } else {
+      const c = catById(o.categoryId);
+      const acc = accountById(o.accountId);
+      btn.innerHTML = `
+        <span class="op__icon" style="background:${(c?.color || '#999')}1f">${c?.icon || '❓'}</span>
+        <span class="op__main">
+          <span class="op__cat">${escapeHtml(c?.name || 'Sans catégorie')}</span>
+          <span class="op__note">${acc ? acc.icon + ' ' : ''}${escapeHtml(o.note || (acc ? acc.name : ''))}</span>
+        </span>
+        <span class="op__amount ${o.type === 'income' ? 'is-in' : 'is-out'}">
+          ${o.type === 'income' ? '+' : '–'} ${fmt(o.amount)}
+        </span>`;
+    }
     btn.addEventListener('click', () => editOperation(o.id));
     li.appendChild(btn);
     return li;
@@ -532,10 +549,19 @@
   function setAddType(type) {
     state.addType = type;
     $$('.type-toggle__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.type === type));
-    // garder la catégorie si compatible, sinon réinitialiser
-    const c = catById(state.addCatId);
-    if (!c || c.type !== type) state.addCatId = null;
-    renderCatGrid();
+    const isTransfer = type === 'transfer';
+    $('#add-cat-block').hidden = isTransfer;
+    $('#add-acc-block').hidden = isTransfer;
+    $('#add-transfer-block').hidden = !isTransfer;
+    if (isTransfer) {
+      fillAccountSelect($('#add-from-acc'), state.accounts[0] && state.accounts[0].id);
+      fillAccountSelect($('#add-to-acc'), state.accounts[1] && state.accounts[1].id);
+    } else {
+      // garder la catégorie si compatible, sinon réinitialiser
+      const c = catById(state.addCatId);
+      if (!c || c.type !== type) state.addCatId = null;
+      renderCatGrid();
+    }
   }
 
   // Pastilles de choix du compte (Espèces / Wave / Orange Money / Banque)
@@ -583,20 +609,45 @@
     $('#add-title').textContent = 'Modifier';
     $('#add-save').textContent = 'Enregistrer les modifications';
     $('#add-delete').hidden = false;
-    state.addCatId = o.categoryId;
-    state.addAccountId = o.accountId || (state.accounts[0] && state.accounts[0].id);
-    renderAccPills();
-    setAddType(o.type);
+    if (o.type === 'transfer') {
+      setAddType('transfer');
+      $('#add-from-acc').value = o.accountId;
+      $('#add-to-acc').value = o.toAccountId;
+    } else {
+      state.addCatId = o.categoryId;
+      state.addAccountId = o.accountId || (state.accounts[0] && state.accounts[0].id);
+      renderAccPills();
+      setAddType(o.type);
+    }
   }
 
   async function saveOperation(e) {
     e.preventDefault();
     const amount = parseAmount($('#add-amount').value);
     if (amount <= 0) return toast('Entre un montant');
-    if (!state.addCatId) return toast('Choisis une catégorie');
     const id = $('#add-id').value || uid();
     const existing = state.operations.find((x) => x.id === id);
-    const op = {
+    let op;
+    if (state.addType === 'transfer') {
+      const from = $('#add-from-acc').value, to = $('#add-to-acc').value;
+      if (from === to) return toast('Choisis deux comptes différents');
+      op = {
+        id, amount, type: 'transfer',
+        categoryId: null,
+        accountId: from,
+        toAccountId: to,
+        date: $('#add-date').value || todayISO(),
+        note: $('#add-note').value.trim(),
+        createdAt: existing ? existing.createdAt : new Date().toISOString(),
+      };
+      await put('operations', op);
+      if (existing) Object.assign(existing, op); else state.operations.push(op);
+      toast('Transfert enregistré ✓');
+      resetAddForm();
+      return goto('home');
+    }
+    if (!state.addCatId) return toast('Choisis une catégorie');
+    op = {
       id,
       amount,
       categoryId: state.addCatId,
@@ -1237,6 +1288,15 @@
     // thème clair / sombre
     $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => applyTheme(b.dataset.themeSet)));
 
+    // code PIN
+    $('#pin-toggle-btn').addEventListener('click', togglePin);
+    $('#pin-modal-save').addEventListener('click', savePin);
+    $$('[data-close-pin]').forEach((b) => b.addEventListener('click', closePinModal));
+    $('#lock-keypad').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pin]');
+      if (b) pinPress(b.dataset.pin);
+    });
+
     // factures & abonnements (écran Budgets)
     $('#add-bill-btn').addEventListener('click', () => openRecurModal(null, 'expense'));
     $('#bills-list').addEventListener('click', (e) => {
@@ -1366,6 +1426,67 @@
     $$('[data-theme-set]').forEach((b) => b.classList.toggle('is-active', b.dataset.themeSet === (dark ? 'dark' : 'light')));
   }
 
+  /* ---------------- Code PIN ---------------- */
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  function pinHash() { try { return localStorage.getItem('nafa-pin') || ''; } catch { return ''; } }
+  function hasPin() { return !!pinHash(); }
+
+  let pinEntry = '';
+  function renderPinDots() {
+    $$('#lock-dots .lock__dot').forEach((d, i) => d.classList.toggle('is-on', i < pinEntry.length));
+  }
+  function showLock() { pinEntry = ''; renderPinDots(); $('#lock-err').hidden = true; $('#lock-screen').hidden = false; }
+  function hideLock() { $('#lock-screen').hidden = true; }
+  async function pinPress(key) {
+    if (key === 'del') { pinEntry = pinEntry.slice(0, -1); renderPinDots(); $('#lock-err').hidden = true; return; }
+    if (pinEntry.length >= 4) return;
+    pinEntry += key;
+    renderPinDots();
+    if (pinEntry.length === 4) {
+      const ok = (await sha256(pinEntry)) === pinHash();
+      if (ok) { hideLock(); }
+      else {
+        $('#lock-err').hidden = false;
+        const inner = $('#lock-screen .lock__inner');
+        inner.classList.remove('shake'); void inner.offsetWidth; inner.classList.add('shake');
+        pinEntry = ''; renderPinDots();
+      }
+    }
+  }
+
+  function renderSecurity() {
+    $('#pin-toggle-btn').textContent = hasPin() ? '🔓 Désactiver le code PIN' : '🔒 Activer le code PIN';
+  }
+  function openPinModal() {
+    $('#pin-modal-code').value = '';
+    $('#pin-modal-confirm').value = '';
+    $('#pin-modal').hidden = false;
+  }
+  function closePinModal() { $('#pin-modal').hidden = true; }
+  async function savePin() {
+    const code = $('#pin-modal-code').value.trim();
+    const conf = $('#pin-modal-confirm').value.trim();
+    if (!/^\d{4}$/.test(code)) return toast('Choisis 4 chiffres');
+    if (code !== conf) return toast('Les deux codes diffèrent');
+    try { localStorage.setItem('nafa-pin', await sha256(code)); } catch {}
+    closePinModal();
+    renderSecurity();
+    toast('Code PIN activé ✓');
+  }
+  function togglePin() {
+    if (hasPin()) {
+      if (!confirm('Désactiver le code PIN ?')) return;
+      try { localStorage.removeItem('nafa-pin'); } catch {}
+      renderSecurity();
+      toast('Code PIN désactivé');
+    } else {
+      openPinModal();
+    }
+  }
+
   /* ---------------- Démarrage ---------------- */
   async function init() {
     db = await openDB();
@@ -1401,6 +1522,8 @@
 
     wire();
     applyTheme(getTheme());
+    renderSecurity();
+    if (hasPin()) showLock();
     goto('home');
 
     if ('serviceWorker' in navigator) {

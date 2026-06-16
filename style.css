@@ -147,6 +147,8 @@ button{font-family:inherit;cursor:pointer}
 .op__amount{font-weight:800;font-size:.98rem;white-space:nowrap}
 .op__amount.is-in{color:var(--in)}
 .op__amount.is-out{color:var(--out)}
+.op__amount--neutral{color:var(--muted)}
+.type-toggle--3 .type-toggle__btn{font-size:.86rem;padding:10px 4px}
 .empty{
   color:var(--muted);text-align:center;padding:34px 16px;font-size:.9rem;line-height:1.5;
   background:var(--card);border:1px dashed var(--line);border-radius:18px;
@@ -455,6 +457,26 @@ button{font-family:inherit;cursor:pointer}
 }
 .toast[hidden]{display:none}
 @keyframes fadein{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* ---------- Écran de verrouillage (PIN) ---------- */
+.lock{position:fixed;inset:0;z-index:100;background:var(--bg);
+  display:grid;place-items:center;padding:24px}
+.lock[hidden]{display:none}
+.lock__inner{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:300px}
+.lock__logo{width:58px;height:58px;border-radius:18px;font-size:1.6rem}
+.lock__title{font-size:1.5rem;font-weight:800}
+.lock__sub{color:var(--muted);margin:0 0 4px}
+.lock__dots{display:flex;gap:14px;margin:6px 0 2px}
+.lock__dot{width:14px;height:14px;border-radius:50%;background:var(--surface-2);border:2px solid var(--line);transition:.15s}
+.lock__dot.is-on{background:var(--teal-2);border-color:var(--teal-2);box-shadow:0 0 0 4px var(--teal-soft)}
+.lock__err{color:var(--out);font-weight:700;font-size:.85rem;height:18px;margin:0}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px;width:100%}
+.keypad__key{height:64px;border-radius:50%;border:1px solid var(--line);background:var(--card);
+  font-size:1.5rem;font-weight:700;color:var(--ink);box-shadow:var(--shadow-soft);transition:transform .08s}
+.keypad__key:active{transform:scale(.92);background:var(--surface-2)}
+.keypad__key--del{font-size:1.2rem;color:var(--muted);box-shadow:none;border-color:transparent;background:transparent}
+.shake{animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 
 /* ---------- Polish v3 (coloré & vivant) ---------- */
 .section-head h2{position:relative;padding-left:13px}
