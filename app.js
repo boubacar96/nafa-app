@@ -236,15 +236,22 @@
   }
 
   /* ---------------- Navigation ---------------- */
+  // Les sous-écrans des Réglages gardent l'onglet "Réglages" actif
+  const SCREEN_TAB = { accounts: 'settings', recurrents: 'settings', categories: 'settings' };
+
   function goto(screen) {
     state.viewMonth = currentMonthKey(); // on repart toujours du mois courant
     $$('.screen').forEach((s) => { s.hidden = s.dataset.screen !== screen; });
-    $$('.tabbar__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.goto === screen));
+    const tab = SCREEN_TAB[screen] || screen;
+    $$('.tabbar__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.goto === tab));
     window.scrollTo(0, 0);
     if (screen === 'home') renderHome();
     if (screen === 'history') renderHistoryScreen();
     if (screen === 'budgets') renderBudgets();
-    if (screen === 'settings') renderSettings();
+    if (screen === 'settings') renderSettingsMenu();
+    if (screen === 'accounts') renderAccountsSettings();
+    if (screen === 'recurrents') renderRecurrents();
+    if (screen === 'categories') renderCategoriesScreen();
     if (screen === 'add' && !$('#add-id').value) resetAddForm();
   }
 
@@ -1317,7 +1324,7 @@
     if (existing) Object.assign(existing, acc);
     else state.accounts.push(acc);
     closeAccountModal();
-    renderSettings();
+    renderAccountsSettings();
     toast('Compte enregistré ✓');
   }
 
@@ -1328,16 +1335,32 @@
     if (!confirm(`Supprimer le compte « ${a.name} » ?`)) return;
     await del('accounts', a.id);
     state.accounts = state.accounts.filter((x) => x.id !== a.id);
-    renderSettings();
+    renderAccountsSettings();
     toast('Compte supprimé');
   }
 
   /* ---------------- Réglages : catégories ---------------- */
-  function renderSettings() {
-    renderAccountsSettings();
-    renderRecurrents();
+  // Menu principal des Réglages : compteurs + interrupteurs
+  function renderSettingsMenu() {
+    const n = state.accounts.length;
+    const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+    setText('#set-accounts-count', n + (n > 1 ? ' comptes' : ' compte'));
+    setText('#set-categories-count', state.categories.length + ' catégories');
+    const r = state.recurrents.length;
+    setText('#set-recurrents-count', r ? r + (r > 1 ? ' actives' : ' active') : 'Aucune');
+    syncSwitches();
+  }
+
+  function syncSwitches() {
+    const t = $('#theme-switch'); if (t) t.classList.toggle('is-on', getTheme() === 'dark');
+    const p = $('#pin-switch'); if (p) p.classList.toggle('is-on', hasPin());
+  }
+
+  // Sous-écran Catégories
+  function renderCategoriesScreen() {
     ['expense', 'income'].forEach((type) => {
       const ul = $(`#cat-list-${type}`);
+      if (!ul) return;
       ul.innerHTML = '';
       state.categories.filter((c) => c.type === type).forEach((c) => {
         const li = document.createElement('li');
@@ -1384,7 +1407,7 @@
     else state.categories.push(cat);
     $('#cat-filter').dataset.filled = ''; // refaire le filtre historique
     closeCatModal();
-    renderSettings();
+    renderCategoriesScreen();
     toast('Catégorie enregistrée ✓');
   }
 
@@ -1398,7 +1421,7 @@
     await del('categories', cat.id);
     state.categories = state.categories.filter((c) => c.id !== cat.id);
     $('#cat-filter').dataset.filled = '';
-    renderSettings();
+    renderCategoriesScreen();
     toast('Catégorie supprimée');
   }
 
@@ -1463,11 +1486,11 @@
     });
     $('#install-btn').addEventListener('click', installApp);
 
-    // thème clair / sombre
-    $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => applyTheme(b.dataset.themeSet)));
+    // thème clair / sombre (interrupteur)
+    $('#theme-switch').addEventListener('click', () => applyTheme(getTheme() === 'dark' ? 'light' : 'dark'));
 
-    // code PIN
-    $('#pin-toggle-btn').addEventListener('click', togglePin);
+    // code PIN (interrupteur)
+    $('#pin-switch').addEventListener('click', togglePin);
     $('#pin-modal-save').addEventListener('click', savePin);
     $$('[data-close-pin]').forEach((b) => b.addEventListener('click', closePinModal));
     $('#lock-keypad').addEventListener('click', (e) => {
@@ -1610,7 +1633,7 @@
     try { localStorage.setItem('nafa-theme', dark ? 'dark' : 'light'); } catch {}
     const meta = $('#theme-color-meta');
     if (meta) meta.setAttribute('content', dark ? '#0d1411' : '#eef3f1');
-    $$('[data-theme-set]').forEach((b) => b.classList.toggle('is-active', b.dataset.themeSet === (dark ? 'dark' : 'light')));
+    const sw = $('#theme-switch'); if (sw) sw.classList.toggle('is-on', dark);
   }
 
   /* ---------------- Code PIN ---------------- */
@@ -1644,30 +1667,27 @@
     }
   }
 
-  function renderSecurity() {
-    $('#pin-toggle-btn').textContent = hasPin() ? '🔓 Désactiver le code PIN' : '🔒 Activer le code PIN';
-  }
   function openPinModal() {
     $('#pin-modal-code').value = '';
     $('#pin-modal-confirm').value = '';
     $('#pin-modal').hidden = false;
   }
-  function closePinModal() { $('#pin-modal').hidden = true; }
+  function closePinModal() { $('#pin-modal').hidden = true; syncSwitches(); }
   async function savePin() {
     const code = $('#pin-modal-code').value.trim();
     const conf = $('#pin-modal-confirm').value.trim();
     if (!/^\d{4}$/.test(code)) return toast('Choisis 4 chiffres');
     if (code !== conf) return toast('Les deux codes diffèrent');
     try { localStorage.setItem('nafa-pin', await sha256(code)); } catch {}
-    closePinModal();
-    renderSecurity();
+    $('#pin-modal').hidden = true;
+    syncSwitches();
     toast('Code PIN activé ✓');
   }
   function togglePin() {
     if (hasPin()) {
-      if (!confirm('Désactiver le code PIN ?')) return;
+      if (!confirm('Désactiver le code PIN ?')) { syncSwitches(); return; }
       try { localStorage.removeItem('nafa-pin'); } catch {}
-      renderSecurity();
+      syncSwitches();
       toast('Code PIN désactivé');
     } else {
       openPinModal();
@@ -1715,7 +1735,6 @@
 
     wire();
     applyTheme(getTheme());
-    renderSecurity();
     if (hasPin()) showLock();
     goto('home');
 

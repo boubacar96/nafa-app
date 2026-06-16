@@ -234,50 +234,118 @@
       </header>
 
       <div class="section-head"><h2>Objectif d'épargne</h2></div>
-      <p class="hint">Fixe un but (ex. «&nbsp;500&nbsp;000 pour la Tabaski&nbsp;») et choisis le compte qui sert d'épargne. Sa progression suit le solde de ce compte.</p>
+      <p class="hint">Un but à atteindre, suivi sur le solde d'un compte.</p>
       <div id="goal-section"></div>
 
-      <div class="section-head"><h2>Mes factures &amp; abonnements</h2></div>
-      <p class="hint">Liste tes charges qui reviennent (Internet, SENELEC/WOYOFAL, loyer, gardiennage…). Quand tu en règles une, appuie sur «&nbsp;Payer&nbsp;»&nbsp;: le montant (ajustable) est déduit de ton solde. Tout se remet à «&nbsp;à payer&nbsp;» chaque mois.</p>
+      <div class="section-head"><h2>Factures &amp; abonnements</h2></div>
+      <p class="hint">Tes charges qui reviennent. «&nbsp;Payer&nbsp;» déduit du solde&nbsp;; remise à zéro chaque mois.</p>
       <div class="bills-summary" id="bills-summary" hidden></div>
       <ul class="bills-list" id="bills-list"></ul>
       <button class="btn btn--ghost full" id="add-bill-btn">+ Facture / abonnement</button>
 
       <div class="section-head"><h2>Budgets par catégorie</h2></div>
-      <p class="hint">Fixe une limite par catégorie. À 80&nbsp;% le voyant passe à l'orange, rouge si tu dépasses.</p>
+      <p class="hint">Une limite par catégorie — orange à 80&nbsp;%, rouge si dépassé.</p>
       <div class="budget-summary" id="budget-summary" hidden></div>
       <ul class="budget-list" id="budget-list"></ul>
     </section>
 
-    <!-- ---------- Écran : Réglages ---------- -->
+    <!-- ---------- Écran : Réglages (menu) ---------- -->
     <section class="screen" id="screen-settings" data-screen="settings" hidden>
-      <header class="app-header">
-        <h1 class="app-header__title">Réglages</h1>
-      </header>
+      <header class="app-header"><h1 class="app-header__title">Réglages</h1></header>
 
-      <div class="section-head"><h2>Apparence</h2></div>
-      <div class="view-toggle" id="theme-toggle">
-        <button class="view-toggle__btn" data-theme-set="light">☀️ Clair</button>
-        <button class="view-toggle__btn" data-theme-set="dark">🌙 Sombre</button>
+      <p class="set-group__title">Préférences</p>
+      <div class="settings-group">
+        <div class="set-row">
+          <span class="set-row__icon" style="background:#6d6cf022">🌙</span>
+          <span class="set-row__label">Mode sombre</span>
+          <button class="switch" id="theme-switch" role="switch" aria-label="Mode sombre"><span class="switch__dot"></span></button>
+        </div>
+        <div class="set-row">
+          <span class="set-row__icon" style="background:#f0566b22">🔒</span>
+          <span class="set-row__label">Code PIN à l'ouverture</span>
+          <button class="switch" id="pin-switch" role="switch" aria-label="Code PIN"><span class="switch__dot"></span></button>
+        </div>
       </div>
 
-      <div class="section-head"><h2>Sécurité</h2></div>
-      <p class="hint">Protège l'ouverture de l'app par un code à 4 chiffres (pratique si on te prend ton téléphone).</p>
-      <button class="btn btn--ghost full" id="pin-toggle-btn">🔒 Activer le code PIN</button>
+      <p class="set-group__title">Mon argent</p>
+      <div class="settings-group">
+        <button class="set-row set-row--nav" data-goto="accounts">
+          <span class="set-row__icon" style="background:#1dc4e922">💳</span>
+          <span class="set-row__label">Mes comptes</span>
+          <span class="set-row__value" id="set-accounts-count"></span>
+          <span class="set-row__chev">›</span>
+        </button>
+        <button class="set-row set-row--nav" data-goto="recurrents">
+          <span class="set-row__icon" style="background:#16c39a22">🔁</span>
+          <span class="set-row__label">Charges &amp; revenus récurrents</span>
+          <span class="set-row__value" id="set-recurrents-count"></span>
+          <span class="set-row__chev">›</span>
+        </button>
+        <button class="set-row set-row--nav" data-goto="categories">
+          <span class="set-row__icon" style="background:#f59e0b22">🏷️</span>
+          <span class="set-row__label">Catégories</span>
+          <span class="set-row__value" id="set-categories-count"></span>
+          <span class="set-row__chev">›</span>
+        </button>
+      </div>
 
-      <div class="section-head"><h2>Mes comptes</h2></div>
+      <p class="set-group__title">Sauvegarde</p>
+      <div class="settings-group">
+        <button class="set-row set-row--nav" id="export-btn">
+          <span class="set-row__icon" style="background:#16c39a22">⤓</span>
+          <span class="set-row__label">Exporter mes données</span>
+          <span class="set-row__chev">›</span>
+        </button>
+        <button class="set-row set-row--nav" id="import-btn">
+          <span class="set-row__icon" style="background:#3b82f622">⤒</span>
+          <span class="set-row__label">Importer une sauvegarde</span>
+          <span class="set-row__chev">›</span>
+        </button>
+      </div>
+      <input type="file" id="import-file" accept="application/json,.json" hidden />
+
+      <div id="install-row" hidden>
+        <p class="set-group__title">Installation</p>
+        <div class="settings-group">
+          <button class="set-row set-row--nav" id="install-btn">
+            <span class="set-row__icon" style="background:#16c39a22">📲</span>
+            <span class="set-row__label">Installer l'application</span>
+            <span class="set-row__chev">›</span>
+          </button>
+        </div>
+      </div>
+
+      <p class="hint set-about">Nafa — tes données restent sur cet appareil, en privé, et l'app fonctionne hors-ligne.<br><strong>Android</strong> : menu ⋮ → «&nbsp;Ajouter à l'écran d'accueil&nbsp;». <strong>iPhone</strong> : Partager → «&nbsp;Sur l'écran d'accueil&nbsp;».</p>
+    </section>
+
+    <!-- ---------- Sous-écran : Mes comptes ---------- -->
+    <section class="screen" id="screen-accounts" data-screen="accounts" hidden>
+      <header class="app-header app-header--sub">
+        <button class="back-btn" data-goto="settings" aria-label="Retour">‹</button>
+        <h1 class="app-header__title">Mes comptes</h1>
+      </header>
       <p class="hint">Espèces, Wave, Orange Money, Banque… Choisis le compte à chaque opération&nbsp;: l'app suit le solde de chacun. Mets un «&nbsp;solde de départ&nbsp;» pour partir du bon montant.</p>
       <ul class="recur-list" id="account-list"></ul>
       <button class="btn btn--ghost full" id="add-account-btn">+ Nouveau compte</button>
+    </section>
 
-      <div class="section-head"><h2>Charges fixes &amp; revenus récurrents</h2></div>
+    <!-- ---------- Sous-écran : Récurrences ---------- -->
+    <section class="screen" id="screen-recurrents" data-screen="recurrents" hidden>
+      <header class="app-header app-header--sub">
+        <button class="back-btn" data-goto="settings" aria-label="Retour">‹</button>
+        <h1 class="app-header__title">Charges &amp; récurrents</h1>
+      </header>
       <p class="hint">Loyer, salaire, abonnements… Définis-les une fois&nbsp;: chaque mois, dès le jour venu, l'app te les proposera sur l'accueil — tu confirmes (ou ajustes le montant).</p>
       <ul class="recur-list" id="recur-list"></ul>
       <button class="btn btn--ghost full" id="add-recur-btn">+ Nouvelle récurrence</button>
+    </section>
 
-      <div class="section-head"><h2>Catégories</h2></div>
-      <p class="hint">Ajoute, renomme ou supprime tes catégories de dépenses et de revenus.</p>
-
+    <!-- ---------- Sous-écran : Catégories ---------- -->
+    <section class="screen" id="screen-categories" data-screen="categories" hidden>
+      <header class="app-header app-header--sub">
+        <button class="back-btn" data-goto="settings" aria-label="Retour">‹</button>
+        <h1 class="app-header__title">Catégories</h1>
+      </header>
       <div class="cat-manage">
         <h3 class="cat-manage__h">Dépenses</h3>
         <ul class="cat-manage__list" id="cat-list-expense"></ul>
@@ -288,21 +356,6 @@
         <ul class="cat-manage__list" id="cat-list-income"></ul>
         <button class="btn btn--ghost full" id="add-cat-btn-income">+ Ajouter un revenu</button>
       </div>
-
-      <div class="section-head"><h2>Sauvegarde</h2></div>
-      <p class="hint">Tes données sont uniquement sur cet appareil. Exporte un fichier de sauvegarde (à garder sur Google&nbsp;Drive, ou à t'envoyer sur WhatsApp) pour les retrouver si tu changes de téléphone.</p>
-      <button class="btn btn--ghost full" id="export-btn">⤓ Exporter mes données</button>
-      <button class="btn btn--ghost full" id="import-btn">⤒ Importer une sauvegarde</button>
-      <input type="file" id="import-file" accept="application/json,.json" hidden />
-
-      <div class="section-head"><h2>Installer sur le téléphone</h2></div>
-      <div id="install-row" hidden>
-        <button class="btn btn--primary full" id="install-btn">📲 Installer l'application</button>
-      </div>
-      <p class="hint"><strong>Android (Chrome)</strong> : menu ⋮ → «&nbsp;Ajouter à l'écran d'accueil&nbsp;».<br><strong>iPhone (Safari)</strong> : bouton Partager → «&nbsp;Sur l'écran d'accueil&nbsp;».</p>
-
-      <div class="section-head"><h2>À propos</h2></div>
-      <p class="hint">Nafa — tes données restent sur cet appareil, en privé. Fonctionne hors-ligne.</p>
     </section>
 
   </div>
