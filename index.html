@@ -165,22 +165,19 @@
       <ul class="recur-list" id="recur-list"></ul>
       <button class="btn btn--ghost full" id="add-recur-btn">+ Nouvelle récurrence</button>
 
-      <div class="section-head"><h2>Catégories</h2></div>
-      <p class="hint">Ajoute, renomme ou supprime tes catégories de dépenses et de revenus.</p>
+      <div class="section-head"><h2>Familles (regroupement)</h2></div>
+      <p class="hint">Regroupe tes catégories en familles (Maison, Factures, Abonnements…). On les retrouve regroupées dans les Budgets.</p>
+      <ul class="group-list" id="group-list"></ul>
+      <button class="btn btn--ghost full" id="add-group-btn">+ Nouvelle famille</button>
 
-      <div class="cat-manage" id="cat-manage-expense">
-        <h3 class="cat-manage__h">Dépenses</h3>
-        <ul class="cat-manage__list" id="cat-list-expense"></ul>
-      </div>
-      <div class="cat-manage" id="cat-manage-income">
-        <h3 class="cat-manage__h">Revenus</h3>
-        <ul class="cat-manage__list" id="cat-list-income"></ul>
-      </div>
+      <div class="section-head"><h2>Catégories</h2></div>
+      <p class="hint">Ajoute, renomme ou supprime tes catégories. Chaque catégorie appartient à une famille.</p>
+      <div class="cat-manage" id="cat-grouped-list"></div>
 
       <button class="btn btn--ghost full" id="add-cat-btn">+ Nouvelle catégorie</button>
 
       <div class="section-head"><h2>À propos</h2></div>
-      <p class="hint">Nafa — tes données restent sur cet appareil, en privé. Version 0.1 (socle).</p>
+      <p class="hint">Nafa — tes données restent sur cet appareil, en privé.</p>
     </section>
 
   </div>
@@ -227,9 +224,37 @@
           </select>
         </label>
       </div>
+      <label class="field">
+        <span class="field-label">Famille</span>
+        <select id="cat-modal-group" class="select"></select>
+      </label>
       <div class="add-actions">
         <button type="button" class="btn btn--ghost" data-close-modal>Annuler</button>
         <button type="button" class="btn btn--primary" id="cat-modal-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== Modale famille ====================== -->
+  <div class="modal" id="group-modal" hidden>
+    <div class="modal__backdrop" data-close-group></div>
+    <div class="modal__card">
+      <h3 id="group-modal-title">Nouvelle famille</h3>
+      <input type="hidden" id="group-modal-id" />
+      <div class="row-fields">
+        <label class="field" style="flex:2">
+          <span class="field-label">Nom</span>
+          <input type="text" id="group-modal-name" maxlength="30" placeholder="ex. Abonnements" />
+        </label>
+        <label class="field">
+          <span class="field-label">Icône</span>
+          <input type="text" id="group-modal-icon" maxlength="2" placeholder="📱" />
+        </label>
+      </div>
+      <div class="add-actions">
+        <button type="button" class="btn btn--ghost danger" id="group-modal-remove" hidden>Supprimer</button>
+        <button type="button" class="btn btn--ghost" data-close-group>Annuler</button>
+        <button type="button" class="btn btn--primary" id="group-modal-save">Enregistrer</button>
       </div>
     </div>
   </div>
