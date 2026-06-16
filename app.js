@@ -65,6 +65,13 @@
       r.onerror = () => rej(r.error);
     });
   }
+  function clearStore(store) {
+    return new Promise((res, rej) => {
+      const r = tx(store, 'readwrite').clear();
+      r.onsuccess = () => res();
+      r.onerror = () => rej(r.error);
+    });
+  }
 
   /* ---------------- Catégories par défaut ---------------- */
   const DEFAULT_CATEGORIES = [
@@ -987,6 +994,15 @@
     $('#cat-modal-save').addEventListener('click', saveCatModal);
     $$('[data-close-modal]').forEach((b) => b.addEventListener('click', closeCatModal));
 
+    // sauvegarde + installation
+    $('#export-btn').addEventListener('click', exportData);
+    $('#import-btn').addEventListener('click', () => $('#import-file').click());
+    $('#import-file').addEventListener('change', (e) => {
+      if (e.target.files[0]) importData(e.target.files[0]);
+      e.target.value = '';
+    });
+    $('#install-btn').addEventListener('click', installApp);
+
     // factures & abonnements (écran Budgets)
     $('#add-bill-btn').addEventListener('click', () => openRecurModal(null, 'expense'));
     $('#bills-list').addEventListener('click', (e) => {
@@ -1040,6 +1056,67 @@
         e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
       }
     });
+  }
+
+  /* ---------------- Sauvegarde : export / import ---------------- */
+  const BACKUP_STORES = ['categories', 'operations', 'budgets', 'recurrents'];
+
+  async function exportData() {
+    const data = { app: 'nafa', version: 1, exportedAt: new Date().toISOString() };
+    for (const s of BACKUP_STORES) data[s] = await getAll(s);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nafa-sauvegarde-${todayISO()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Sauvegarde exportée ✓');
+  }
+
+  async function importData(file) {
+    let data;
+    try {
+      data = JSON.parse(await file.text());
+    } catch {
+      return alert('Fichier illisible — ce n’est pas une sauvegarde valide.');
+    }
+    if (!data || data.app !== 'nafa' || !Array.isArray(data.categories)) {
+      return alert('Ce fichier n’est pas une sauvegarde Nafa.');
+    }
+    const opsN = (data.operations || []).length;
+    if (!confirm(`Importer cette sauvegarde (${data.categories.length} catégories, ${opsN} opérations) ?\n\n⚠️ Cela remplacera toutes tes données actuelles.`)) return;
+    for (const s of BACKUP_STORES) {
+      await clearStore(s);
+      for (const item of (data[s] || [])) await put(s, item);
+    }
+    toast('Sauvegarde importée ✓');
+    setTimeout(() => location.reload(), 700);
+  }
+
+  /* ---------------- Installation (PWA) ---------------- */
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const row = $('#install-row');
+    if (row) row.hidden = false;
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    const row = $('#install-row');
+    if (row) row.hidden = true;
+    toast('Nafa installée ✓');
+  });
+  async function installApp() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    const row = $('#install-row');
+    if (row) row.hidden = true;
   }
 
   /* ---------------- Démarrage ---------------- */

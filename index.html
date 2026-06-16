@@ -207,8 +207,20 @@
         <button class="btn btn--ghost full" id="add-cat-btn-income">+ Ajouter un revenu</button>
       </div>
 
+      <div class="section-head"><h2>Sauvegarde</h2></div>
+      <p class="hint">Tes données sont uniquement sur cet appareil. Exporte un fichier de sauvegarde (à garder sur Google&nbsp;Drive, ou à t'envoyer sur WhatsApp) pour les retrouver si tu changes de téléphone.</p>
+      <button class="btn btn--ghost full" id="export-btn">⤓ Exporter mes données</button>
+      <button class="btn btn--ghost full" id="import-btn">⤒ Importer une sauvegarde</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden />
+
+      <div class="section-head"><h2>Installer sur le téléphone</h2></div>
+      <div id="install-row" hidden>
+        <button class="btn btn--primary full" id="install-btn">📲 Installer l'application</button>
+      </div>
+      <p class="hint"><strong>Android (Chrome)</strong> : menu ⋮ → «&nbsp;Ajouter à l'écran d'accueil&nbsp;».<br><strong>iPhone (Safari)</strong> : bouton Partager → «&nbsp;Sur l'écran d'accueil&nbsp;».</p>
+
       <div class="section-head"><h2>À propos</h2></div>
-      <p class="hint">Nafa — tes données restent sur cet appareil, en privé.</p>
+      <p class="hint">Nafa — tes données restent sur cet appareil, en privé. Fonctionne hors-ligne.</p>
     </section>
 
   </div>
