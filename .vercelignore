@@ -1,0 +1,8 @@
+_backup_v1/
+_backup*/
+docs/
+*.bak
+*.tmp
+*.new
+_commit_msg.txt
+.claude/
