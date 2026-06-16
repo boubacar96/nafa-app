@@ -163,6 +163,43 @@ button{font-family:inherit;cursor:pointer}
 .btn--ghost.full{width:100%;margin-top:4px}
 .btn.danger{color:var(--out);background:#fbe7ea}
 
+/* ---------- Bascule Liste / Rapports ---------- */
+.view-toggle{display:flex;background:#e3e9e6;border-radius:14px;padding:5px;gap:5px;margin-bottom:12px}
+.view-toggle__btn{flex:1;border:none;background:transparent;padding:11px;border-radius:11px;
+  font-weight:700;color:var(--muted);font-size:.92rem;transition:.15s}
+.view-toggle__btn.is-active{background:#fff;color:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.08)}
+
+/* ---------- Rapports ---------- */
+.report-bilan{display:flex;gap:8px;margin-bottom:16px}
+.rbilan__cell{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:11px 10px;display:flex;flex-direction:column;gap:3px;box-shadow:var(--shadow-soft)}
+.rbilan__cell span{font-size:.72rem;color:var(--muted);font-weight:600}
+.rbilan__cell strong{font-size:.92rem;font-weight:800}
+.rbilan__cell strong.is-in{color:var(--in)}
+.rbilan__cell strong.is-out{color:var(--out)}
+.report-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;
+  box-shadow:var(--shadow-soft);margin-bottom:14px}
+.report-card__title{font-size:1rem;font-weight:800;margin-bottom:14px}
+
+.donut-wrap{display:flex;justify-content:center;margin-bottom:6px}
+.donut{width:170px;height:170px}
+.donut__total{font-size:15px;font-weight:800;fill:var(--ink);font-family:var(--font)}
+.donut__label{font-size:8px;fill:var(--muted);font-weight:600;font-family:var(--font)}
+.legend{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+.legend__item{display:flex;align-items:center;gap:9px}
+.legend__dot{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
+.legend__name{flex:1;font-weight:600;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend__val{font-weight:800;font-size:.88rem;white-space:nowrap}
+.legend__pct{color:var(--muted);font-weight:700;font-size:.78rem;margin-left:2px}
+
+.trend{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:150px}
+.trend__col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.trend__v{font-size:.68rem;font-weight:700;color:var(--muted);height:14px}
+.trend__track{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.trend__bar{width:62%;min-height:3px;border-radius:7px 7px 3px 3px;background:#cfe0da;transition:height .35s ease}
+.trend__bar--cur{background:linear-gradient(180deg,var(--teal-2),var(--teal))}
+.trend__m{font-size:.72rem;font-weight:700;color:var(--muted)}
+
 /* ---------- Filtres historique ---------- */
 .filters{display:flex;flex-direction:column;gap:11px;margin-bottom:16px}
 .seg{display:flex;background:#e3e9e6;border-radius:14px;padding:5px;gap:3px}

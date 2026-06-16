@@ -123,22 +123,42 @@
         <h1 class="app-header__title">Historique</h1>
       </header>
 
+      <div class="view-toggle">
+        <button class="view-toggle__btn is-active" data-view="list">📜 Liste</button>
+        <button class="view-toggle__btn" data-view="report">📊 Rapports</button>
+      </div>
+
       <div class="filters">
         <div class="seg" id="period-seg">
-          <button class="seg__btn is-active" data-period="day">Jour</button>
+          <button class="seg__btn" data-period="day">Jour</button>
           <button class="seg__btn" data-period="week">Semaine</button>
-          <button class="seg__btn is-active2" data-period="month">Mois</button>
+          <button class="seg__btn is-active" data-period="month">Mois</button>
           <button class="seg__btn" data-period="all">Tout</button>
         </div>
         <select id="cat-filter" class="select"></select>
       </div>
 
-      <div class="hist-total">
-        <span id="hist-total-label">Total du mois</span>
-        <strong id="hist-total-value">—</strong>
+      <!-- Vue Liste -->
+      <div id="history-list-view">
+        <div class="hist-total">
+          <span id="hist-total-label">Total du mois</span>
+          <strong id="hist-total-value">—</strong>
+        </div>
+        <ul class="op-list" id="history-list"></ul>
       </div>
 
-      <ul class="op-list" id="history-list"></ul>
+      <!-- Vue Rapports -->
+      <div id="history-report-view" hidden>
+        <div class="report-bilan" id="report-bilan"></div>
+        <div class="report-card">
+          <h3 class="report-card__title">Où part mon argent</h3>
+          <div id="report-donut"></div>
+        </div>
+        <div class="report-card">
+          <h3 class="report-card__title">Tendance des dépenses (6 mois)</h3>
+          <div id="report-trend"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ---------- Écran : Budgets ---------- -->

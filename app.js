@@ -97,6 +97,7 @@
     addCatId: null,
     histPeriod: 'month',
     histCat: 'all',
+    histView: 'list',
   };
 
   /* ---------------- Helpers ---------------- */
@@ -186,7 +187,7 @@
     $$('.tabbar__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.goto === screen));
     window.scrollTo(0, 0);
     if (screen === 'home') renderHome();
-    if (screen === 'history') renderHistory();
+    if (screen === 'history') renderHistoryScreen();
     if (screen === 'budgets') renderBudgets();
     if (screen === 'settings') renderSettings();
     if (screen === 'add' && !$('#add-id').value) resetAddForm();
@@ -554,6 +555,102 @@
     renderOpList($('#history-list'), ops, true);
   }
 
+  function renderHistoryScreen() {
+    const isReport = state.histView === 'report';
+    $('#history-list-view').hidden = isReport;
+    $('#history-report-view').hidden = !isReport;
+    $('#cat-filter').style.display = isReport ? 'none' : '';
+    $$('[data-view]').forEach((b) => b.classList.toggle('is-active', b.dataset.view === state.histView));
+    if (isReport) renderReports(); else renderHistory();
+  }
+
+  /* ---------------- Rapports ---------------- */
+  const periodWord = { day: 'aujourd’hui', week: 'cette semaine', month: 'ce mois', all: 'au total' };
+  const fmtNum = (n) => Math.round(n).toLocaleString('fr-FR');
+  const compact = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(Math.round(n)));
+
+  function renderReports() {
+    const ops = periodFilter(state.operations);
+    const exp = ops.filter((o) => o.type === 'expense');
+    const totalExp = exp.reduce((s, o) => s + o.amount, 0);
+    const totalRev = ops.filter((o) => o.type === 'income').reduce((s, o) => s + o.amount, 0);
+
+    // Bilan de la période
+    $('#report-bilan').innerHTML = `
+      <div class="rbilan__cell"><span>Revenus</span><strong class="is-in">${fmt(totalRev)}</strong></div>
+      <div class="rbilan__cell"><span>Dépenses</span><strong class="is-out">${fmt(totalExp)}</strong></div>
+      <div class="rbilan__cell"><span>Solde ${periodWord[state.histPeriod]}</span><strong>${fmt(totalRev - totalExp)}</strong></div>`;
+
+    // Répartition par catégorie (camembert)
+    const byCat = {};
+    exp.forEach((o) => { byCat[o.categoryId] = (byCat[o.categoryId] || 0) + o.amount; });
+    const slices = Object.entries(byCat)
+      .map(([id, amt]) => ({ cat: catById(id), amt }))
+      .filter((s) => s.cat)
+      .sort((a, b) => b.amt - a.amt);
+
+    const donut = $('#report-donut');
+    if (!slices.length) {
+      donut.innerHTML = `<p class="empty" style="border:none">Pas encore de dépenses ${periodWord[state.histPeriod]}.</p>`;
+    } else {
+      donut.innerHTML = donutSVG(slices, totalExp) +
+        '<ul class="legend">' + slices.map((s) => {
+          const pct = totalExp > 0 ? Math.round((s.amt / totalExp) * 100) : 0;
+          return `<li class="legend__item">
+            <span class="legend__dot" style="background:${s.cat.color}"></span>
+            <span class="legend__name">${s.cat.icon} ${escapeHtml(s.cat.name)}</span>
+            <span class="legend__val">${fmt(s.amt)} <span class="legend__pct">${pct}%</span></span>
+          </li>`;
+        }).join('') + '</ul>';
+    }
+
+    // Tendance des dépenses sur 6 mois
+    renderTrend();
+  }
+
+  function donutSVG(slices, total) {
+    const r = 54, cx = 70, cy = 70, sw = 24, C = 2 * Math.PI * r;
+    let offset = 0;
+    const segs = slices.map((s) => {
+      const len = (total > 0 ? s.amt / total : 0) * C;
+      const el = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.cat.color}" stroke-width="${sw}" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+      offset += len;
+      return el;
+    }).join('');
+    return `<div class="donut-wrap"><svg viewBox="0 0 140 140" class="donut">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#eef2f0" stroke-width="${sw}"/>
+      ${segs}
+      <text x="${cx}" y="${cy - 2}" text-anchor="middle" class="donut__total">${fmtNum(total)}</text>
+      <text x="${cx}" y="${cy + 15}" text-anchor="middle" class="donut__label">FCFA dépensés</text>
+    </svg></div>`;
+  }
+
+  function renderTrend() {
+    const [y, m] = currentMonthKey().split('-').map(Number);
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(y, m - 1 - i, 1);
+      months.push(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}`);
+    }
+    const totals = months.map((mk) =>
+      state.operations
+        .filter((o) => o.type === 'expense' && monthKey(o.date) === mk)
+        .reduce((s, o) => s + o.amount, 0)
+    );
+    const max = Math.max(1, ...totals);
+    const cur = currentMonthKey();
+    const cols = months.map((mk, i) => {
+      const h = Math.round((totals[i] / max) * 100);
+      const label = MONTHS_FR[Number(mk.split('-')[1]) - 1].slice(0, 3).toLowerCase();
+      return `<div class="trend__col">
+        <span class="trend__v">${totals[i] ? compact(totals[i]) : ''}</span>
+        <div class="trend__track"><div class="trend__bar ${mk === cur ? 'trend__bar--cur' : ''}" style="height:${h}%"></div></div>
+        <span class="trend__m">${label}</span>
+      </div>`;
+    }).join('');
+    $('#report-trend').innerHTML = `<div class="trend">${cols}</div>`;
+  }
+
   /* ---------------- Écran Budgets ---------------- */
   function renderBudgets() {
     renderBills();
@@ -868,9 +965,13 @@
     $$('[data-period]').forEach((b) => b.addEventListener('click', () => {
       state.histPeriod = b.dataset.period;
       $$('[data-period]').forEach((x) => x.classList.toggle('is-active', x === b));
-      renderHistory();
+      renderHistoryScreen();
     }));
     $('#cat-filter').addEventListener('change', (e) => { state.histCat = e.target.value; renderHistory(); });
+    $$('[data-view]').forEach((b) => b.addEventListener('click', () => {
+      state.histView = b.dataset.view;
+      renderHistoryScreen();
+    }));
 
     $$('.type-toggle__btn').forEach((b) => b.addEventListener('click', () => setAddType(b.dataset.type)));
     $('#add-form').addEventListener('submit', saveOperation);
