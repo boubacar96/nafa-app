@@ -770,7 +770,7 @@
       return el;
     }).join('');
     return `<div class="donut-wrap"><svg viewBox="0 0 140 140" class="donut">
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#eef2f0" stroke-width="${sw}"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="${sw}"/>
       ${segs}
       <text x="${cx}" y="${cy - 2}" text-anchor="middle" class="donut__total">${fmtNum(total)}</text>
       <text x="${cx}" y="${cy + 15}" text-anchor="middle" class="donut__label">FCFA dépensés</text>
@@ -1234,6 +1234,9 @@
     });
     $('#install-btn').addEventListener('click', installApp);
 
+    // thème clair / sombre
+    $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => applyTheme(b.dataset.themeSet)));
+
     // factures & abonnements (écran Budgets)
     $('#add-bill-btn').addEventListener('click', () => openRecurModal(null, 'expense'));
     $('#bills-list').addEventListener('click', (e) => {
@@ -1350,6 +1353,19 @@
     if (row) row.hidden = true;
   }
 
+  /* ---------------- Thème clair / sombre ---------------- */
+  function getTheme() {
+    try { return localStorage.getItem('nafa-theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
+  }
+  function applyTheme(theme) {
+    const dark = theme === 'dark';
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    try { localStorage.setItem('nafa-theme', dark ? 'dark' : 'light'); } catch {}
+    const meta = $('#theme-color-meta');
+    if (meta) meta.setAttribute('content', dark ? '#0d1411' : '#eef3f1');
+    $$('[data-theme-set]').forEach((b) => b.classList.toggle('is-active', b.dataset.themeSet === (dark ? 'dark' : 'light')));
+  }
+
   /* ---------------- Démarrage ---------------- */
   async function init() {
     db = await openDB();
@@ -1384,6 +1400,7 @@
     $$('[data-period]').forEach((x) => x.classList.toggle('is-active', x.dataset.period === 'month'));
 
     wire();
+    applyTheme(getTheme());
     goto('home');
 
     if ('serviceWorker' in navigator) {
