@@ -112,11 +112,16 @@
     budgets: [],
     recurrents: [],
     accounts: [],
+    goal: null,            // objectif d'épargne {label, target, accountId}
     addType: 'expense',
     addCatId: null,
     addAccountId: null,
+    addAmount: '',         // montant en cours de saisie (chiffres bruts)
+    lastCat: {},           // dernière catégorie utilisée par type
+    lastAccountId: null,   // dernier compte utilisé
     histPeriod: 'month',
     histCat: 'all',
+    histQuery: '',
     histView: 'list',
     viewMonth: null, // mois affiché sur l'accueil/rapports (null = mois courant)
   };
@@ -274,6 +279,7 @@
     $('#home-saving').textContent = fmt(Math.max(solde, 0));
 
     renderHomeAccounts(); // soldes des comptes = toujours actuels (toutes périodes)
+    renderHomeGoal();
 
     // Sections "mois en cours" uniquement (alertes, à confirmer, comparaison)
     if (isCurrent) {
@@ -586,9 +592,13 @@
       fillAccountSelect($('#add-from-acc'), state.accounts[0] && state.accounts[0].id);
       fillAccountSelect($('#add-to-acc'), state.accounts[1] && state.accounts[1].id);
     } else {
-      // garder la catégorie si compatible, sinon réinitialiser
+      // garder la catégorie si compatible, sinon reprendre la dernière utilisée pour ce type
       const c = catById(state.addCatId);
-      if (!c || c.type !== type) state.addCatId = null;
+      if (!c || c.type !== type) {
+        const last = state.lastCat && state.lastCat[type];
+        const lc = last && catById(last);
+        state.addCatId = (lc && lc.type === type) ? last : null;
+      }
       renderCatGrid();
     }
   }
@@ -610,14 +620,15 @@
 
   function resetAddForm() {
     $('#add-id').value = '';
+    state.addAmount = '';
     $('#add-amount').value = '';
     $('#add-note').value = '';
     $('#add-date').value = todayISO();
     $('#add-title').textContent = 'Ajouter';
     $('#add-save').textContent = 'Enregistrer';
     $('#add-delete').hidden = true;
-    state.addCatId = null;
-    if (!accountById(state.addAccountId)) state.addAccountId = state.accounts[0] ? state.accounts[0].id : null;
+    state.addCatId = (state.lastCat && state.lastCat.expense) || null;
+    state.addAccountId = accountById(state.lastAccountId) ? state.lastAccountId : (state.accounts[0] ? state.accounts[0].id : null);
     renderAccPills();
     setAddType('expense');
   }
@@ -627,11 +638,29 @@
     return isNaN(n) ? 0 : n;
   }
 
+  // Pavé numérique de l'écran Ajouter
+  function renderAmount() {
+    const raw = state.addAmount;
+    $('#add-amount').value = raw ? parseInt(raw, 10).toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+  }
+  function keypadPress(key) {
+    if (key === 'del') {
+      state.addAmount = state.addAmount.slice(0, -1);
+    } else if (key === '000') {
+      if (state.addAmount && state.addAmount.length <= 9) state.addAmount += '000';
+    } else if (state.addAmount.length < 12) {
+      state.addAmount = (state.addAmount === '0' ? '' : state.addAmount) + key;
+    }
+    state.addAmount = state.addAmount.replace(/^0+(?=\d)/, '');
+    renderAmount();
+  }
+
   function editOperation(id) {
     const o = state.operations.find((x) => x.id === id);
     if (!o) return;
     goto('add');
     $('#add-id').value = o.id;
+    state.addAmount = String(o.amount);
     $('#add-amount').value = o.amount.toLocaleString('fr-FR').replace(/ /g, ' ');
     $('#add-note').value = o.note || '';
     $('#add-date').value = o.date;
@@ -694,6 +723,13 @@
       state.operations.push(op);
       toast('Enregistré ✓');
     }
+    // mémoriser la dernière catégorie/compte (pour pré-remplir la prochaine fois)
+    state.lastCat = { ...state.lastCat, [op.type]: op.categoryId };
+    state.lastAccountId = op.accountId;
+    try {
+      localStorage.setItem('nafa-lastcat', JSON.stringify(state.lastCat));
+      localStorage.setItem('nafa-lastacc', op.accountId || '');
+    } catch {}
     resetAddForm();
     goto('home');
   }
@@ -725,6 +761,19 @@
     return ops; // all
   }
 
+  // Recherche : note, catégorie, compte, montant, type
+  function opMatchesQuery(o, q) {
+    q = q.trim().toLowerCase();
+    if (!q) return true;
+    const cat = catById(o.categoryId);
+    const acc = accountById(o.accountId);
+    const to = o.toAccountId ? accountById(o.toAccountId) : null;
+    const hay = [o.note, cat && cat.name, acc && acc.name, to && to.name,
+      String(o.amount), fmt(o.amount), o.type === 'transfer' ? 'transfert' : '']
+      .filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  }
+
   function renderHistory() {
     // remplir le filtre catégories
     const sel = $('#cat-filter');
@@ -737,6 +786,7 @@
 
     let ops = periodFilter(state.operations);
     if (state.histCat !== 'all') ops = ops.filter((o) => o.categoryId === state.histCat);
+    if (state.histQuery) ops = ops.filter((o) => opMatchesQuery(o, state.histQuery));
     ops.sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
 
     const dep = ops.filter((o) => o.type === 'expense').reduce((s, o) => s + o.amount, 0);
@@ -894,6 +944,7 @@
 
   /* ---------------- Écran Budgets ---------------- */
   function renderBudgets() {
+    renderGoalSection();
     renderBills();
 
     const spent = spentMap();
@@ -946,6 +997,84 @@
       li.addEventListener('click', () => openBudgetModal(c));
       list.appendChild(li);
     });
+  }
+
+  /* ---------------- Objectif d'épargne ---------------- */
+  function goalProgress() {
+    if (!state.goal) return null;
+    const cur = accountBalance(state.goal.accountId);
+    const target = state.goal.target || 0;
+    const pct = target > 0 ? Math.min(100, Math.round((cur / target) * 100)) : 0;
+    return { cur, target, pct, remaining: target - cur, reached: cur >= target && target > 0 };
+  }
+
+  function goalCardHTML(p) {
+    const acc = accountById(state.goal.accountId);
+    const foot = p.reached
+      ? '🎉 Objectif atteint, bravo !'
+      : `Encore ${fmt(Math.max(0, p.remaining))}${acc ? ' · sur ' + acc.icon + ' ' + escapeHtml(acc.name) : ''}`;
+    return `
+      <div class="goal-card__top">
+        <span class="goal-card__label">🎯 ${escapeHtml(state.goal.label)}</span>
+        <span class="goal-card__nums">${fmt(p.cur)} <span class="goal-card__target">/ ${fmt(p.target)}</span></span>
+      </div>
+      <div class="bar"><div class="bar__fill bar__fill--ok" style="width:${p.pct}%"></div></div>
+      <div class="goal-card__foot">${foot}</div>`;
+  }
+
+  function renderHomeGoal() {
+    const wrap = $('#home-goal');
+    if (!wrap) return;
+    const p = goalProgress();
+    if (!p) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    wrap.innerHTML = `
+      <div class="section-head"><h2>Objectif d'épargne</h2><button class="link-btn" data-goto="budgets">Gérer →</button></div>
+      <div class="goal-card">${goalCardHTML(p)}</div>`;
+    wrap.querySelector('[data-goto]').addEventListener('click', () => goto('budgets'));
+  }
+
+  function renderGoalSection() {
+    const wrap = $('#goal-section');
+    if (!wrap) return;
+    const p = goalProgress();
+    if (!p) {
+      wrap.innerHTML = '<button class="btn btn--ghost full" id="goal-set-btn">🎯 Définir un objectif d’épargne</button>';
+      wrap.querySelector('#goal-set-btn').addEventListener('click', () => openGoalModal());
+    } else {
+      wrap.innerHTML = `<div class="goal-card goal-card--tap" id="goal-edit">${goalCardHTML(p)}</div>`;
+      wrap.querySelector('#goal-edit').addEventListener('click', () => openGoalModal());
+    }
+  }
+
+  function openGoalModal() {
+    const g = state.goal;
+    $('#goal-modal-label').value = g ? g.label : '';
+    $('#goal-modal-target').value = g && g.target ? g.target.toLocaleString('fr-FR') : '';
+    fillAccountSelect($('#goal-modal-acc'), g ? g.accountId : null);
+    $('#goal-modal-remove').hidden = !g;
+    $('#goal-modal').hidden = false;
+  }
+  function closeGoalModal() { $('#goal-modal').hidden = true; }
+
+  async function saveGoal() {
+    const label = $('#goal-modal-label').value.trim() || 'Mon épargne';
+    const target = parseAmount($('#goal-modal-target').value);
+    if (target <= 0) return toast('Entre un montant à atteindre');
+    const goal = { key: 'goal', label, target, accountId: $('#goal-modal-acc').value };
+    await put('settings', goal);
+    state.goal = goal;
+    closeGoalModal();
+    renderBudgets();
+    toast('Objectif enregistré ✓');
+  }
+
+  async function removeGoal() {
+    await del('settings', 'goal');
+    state.goal = null;
+    closeGoalModal();
+    renderBudgets();
+    toast('Objectif retiré');
   }
 
   /* ---------------- Budgets : factures & abonnements ---------------- */
@@ -1282,6 +1411,7 @@
       renderHistoryScreen();
     }));
     $('#cat-filter').addEventListener('change', (e) => { state.histCat = e.target.value; renderHistory(); });
+    $('#hist-search').addEventListener('input', (e) => { state.histQuery = e.target.value; renderHistory(); });
     $$('[data-view]').forEach((b) => b.addEventListener('click', () => {
       state.histView = b.dataset.view;
       renderHistoryScreen();
@@ -1294,6 +1424,10 @@
     $('#report-month-next').addEventListener('click', () => shiftMonth(1));
 
     $$('.type-toggle__btn').forEach((b) => b.addEventListener('click', () => setAddType(b.dataset.type)));
+    $('#add-keypad').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-key]');
+      if (b) keypadPress(b.dataset.key);
+    });
     $('#add-form').addEventListener('submit', saveOperation);
     $('#add-delete').addEventListener('click', deleteOperation);
     // formatage du montant avec séparateurs pendant la frappe
@@ -1339,6 +1473,15 @@
     $('#lock-keypad').addEventListener('click', (e) => {
       const b = e.target.closest('[data-pin]');
       if (b) pinPress(b.dataset.pin);
+    });
+
+    // objectif d'épargne
+    $('#goal-modal-save').addEventListener('click', saveGoal);
+    $('#goal-modal-remove').addEventListener('click', removeGoal);
+    $$('[data-close-goal]').forEach((b) => b.addEventListener('click', closeGoalModal));
+    $('#goal-modal-target').addEventListener('input', (e) => {
+      const n = parseAmount(e.target.value);
+      e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
     });
 
     // factures & abonnements (écran Budgets)
@@ -1544,6 +1687,12 @@
     state.operations = await getAll('operations');
     state.budgets = await getAll('budgets');
     state.recurrents = await getAll('recurrents');
+    const settings = await getAll('settings');
+    state.goal = settings.find((s) => s.key === 'goal') || null;
+    try {
+      state.lastCat = JSON.parse(localStorage.getItem('nafa-lastcat') || '{}');
+      state.lastAccountId = localStorage.getItem('nafa-lastacc') || null;
+    } catch {}
 
     // Comptes : seed si vide, puis migration des opérations sans compte
     let accounts = await getAll('accounts');

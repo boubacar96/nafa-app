@@ -66,6 +66,8 @@
         <div class="acc-cards" id="home-accounts-row"></div>
       </div>
 
+      <div class="home-goal" id="home-goal" hidden></div>
+
       <div class="home-insight" id="home-insight" hidden></div>
 
       <div class="home-pending" id="home-pending" hidden>
@@ -108,7 +110,7 @@
 
         <label class="amount-field">
           <span class="amount-field__currency">FCFA</span>
-          <input id="add-amount" inputmode="numeric" pattern="[0-9 ]*" placeholder="0" />
+          <input id="add-amount" readonly inputmode="none" placeholder="0" />
         </label>
 
         <div id="add-cat-block">
@@ -146,6 +148,21 @@
           <input type="text" id="add-note" maxlength="80" placeholder="ex. taxi marché, avance Modou…" />
         </label>
 
+        <div class="keypad keypad--add" id="add-keypad">
+          <button type="button" class="keypad__key" data-key="1">1</button>
+          <button type="button" class="keypad__key" data-key="2">2</button>
+          <button type="button" class="keypad__key" data-key="3">3</button>
+          <button type="button" class="keypad__key" data-key="4">4</button>
+          <button type="button" class="keypad__key" data-key="5">5</button>
+          <button type="button" class="keypad__key" data-key="6">6</button>
+          <button type="button" class="keypad__key" data-key="7">7</button>
+          <button type="button" class="keypad__key" data-key="8">8</button>
+          <button type="button" class="keypad__key" data-key="9">9</button>
+          <button type="button" class="keypad__key keypad__key--alt" data-key="000">000</button>
+          <button type="button" class="keypad__key" data-key="0">0</button>
+          <button type="button" class="keypad__key keypad__key--del" data-key="del">⌫</button>
+        </div>
+
         <div class="add-actions">
           <button type="button" class="btn btn--ghost danger" id="add-delete" hidden>Supprimer</button>
           <button type="submit" class="btn btn--primary" id="add-save">Enregistrer</button>
@@ -176,6 +193,10 @@
 
       <!-- Vue Liste -->
       <div id="history-list-view">
+        <div class="search-box">
+          <span class="search-box__icon">🔍</span>
+          <input id="hist-search" type="search" inputmode="search" placeholder="Rechercher (note, catégorie, montant…)" />
+        </div>
         <div class="hist-total">
           <span id="hist-total-label">Total du mois</span>
           <strong id="hist-total-value">—</strong>
@@ -211,6 +232,10 @@
           <h1 class="app-header__title">Mon budget</h1>
         </div>
       </header>
+
+      <div class="section-head"><h2>Objectif d'épargne</h2></div>
+      <p class="hint">Fixe un but (ex. «&nbsp;500&nbsp;000 pour la Tabaski&nbsp;») et choisis le compte qui sert d'épargne. Sa progression suit le solde de ce compte.</p>
+      <div id="goal-section"></div>
 
       <div class="section-head"><h2>Mes factures &amp; abonnements</h2></div>
       <p class="hint">Liste tes charges qui reviennent (Internet, SENELEC/WOYOFAL, loyer, gardiennage…). Quand tu en règles une, appuie sur «&nbsp;Payer&nbsp;»&nbsp;: le montant (ajustable) est déduit de ton solde. Tout se remet à «&nbsp;à payer&nbsp;» chaque mois.</p>
@@ -419,6 +444,31 @@
         <button type="button" class="btn btn--ghost danger" id="account-modal-remove" hidden>Supprimer</button>
         <button type="button" class="btn btn--ghost" data-close-account>Annuler</button>
         <button type="button" class="btn btn--primary" id="account-modal-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== Modale objectif d'épargne ====================== -->
+  <div class="modal" id="goal-modal" hidden>
+    <div class="modal__backdrop" data-close-goal></div>
+    <div class="modal__card">
+      <h3>Objectif d'épargne</h3>
+      <label class="field">
+        <span class="field-label">Nom de l'objectif</span>
+        <input type="text" id="goal-modal-label" maxlength="40" placeholder="ex. Tabaski, Voyage, Matelas…" />
+      </label>
+      <label class="field">
+        <span class="field-label">Montant à atteindre (FCFA)</span>
+        <input id="goal-modal-target" inputmode="numeric" pattern="[0-9 ]*" placeholder="0" />
+      </label>
+      <label class="field">
+        <span class="field-label">Compte d'épargne (suit ce solde)</span>
+        <select id="goal-modal-acc" class="select"></select>
+      </label>
+      <div class="add-actions">
+        <button type="button" class="btn btn--ghost danger" id="goal-modal-remove" hidden>Retirer</button>
+        <button type="button" class="btn btn--ghost" data-close-goal>Annuler</button>
+        <button type="button" class="btn btn--primary" id="goal-modal-save">Enregistrer</button>
       </div>
     </div>
   </div>
