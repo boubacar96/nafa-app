@@ -8,7 +8,7 @@
 
   /* ---------------- IndexedDB (mini wrapper) ---------------- */
   const DB_NAME = 'nafa';
-  const DB_VERSION = 4;
+  const DB_VERSION = 5;
   let db = null;
 
   function openDB() {
@@ -34,6 +34,9 @@
         }
         if (!d.objectStoreNames.contains('groups')) {
           d.createObjectStore('groups', { keyPath: 'id' });
+        }
+        if (!d.objectStoreNames.contains('accounts')) {
+          d.createObjectStore('accounts', { keyPath: 'id' });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -94,14 +97,24 @@
     { name: 'Autre revenu',   icon: '➕', color: '#84cc16', type: 'income' },
   ];
 
+  /* ---------------- Comptes (Mobile Money / espèces) ---------------- */
+  const DEFAULT_ACCOUNTS = [
+    { id: 'a-cash', name: 'Espèces',      icon: '💵', color: '#10b981', opening: 0, order: 0 },
+    { id: 'a-wave', name: 'Wave',         icon: '🌊', color: '#1dc4e9', opening: 0, order: 1 },
+    { id: 'a-om',   name: 'Orange Money', icon: '🟠', color: '#f97316', opening: 0, order: 2 },
+    { id: 'a-bank', name: 'Banque',       icon: '🏦', color: '#3b82f6', opening: 0, order: 3 },
+  ];
+
   /* ---------------- État ---------------- */
   const state = {
     categories: [],
     operations: [],
     budgets: [],
     recurrents: [],
+    accounts: [],
     addType: 'expense',
     addCatId: null,
+    addAccountId: null,
     histPeriod: 'month',
     histCat: 'all',
     histView: 'list',
@@ -141,11 +154,34 @@
   function catById(id) { return state.categories.find((c) => c.id === id); }
   function budgetFor(catId) { return state.budgets.find((b) => b.categoryId === catId); }
   function recurrentById(id) { return state.recurrents.find((r) => r.id === id); }
+  function accountById(id) { return state.accounts.find((a) => a.id === id); }
+
+  // Solde courant d'un compte = solde de départ + revenus − dépenses (toutes périodes)
+  function accountBalance(id) {
+    const acc = accountById(id);
+    let bal = acc ? (acc.opening || 0) : 0;
+    state.operations.forEach((o) => {
+      if (o.accountId !== id) return;
+      bal += o.type === 'income' ? o.amount : -o.amount;
+    });
+    return bal;
+  }
 
   const pad2 = (n) => String(n).padStart(2, '0');
   function daysInMonth(mk) {
     const [y, m] = mk.split('-').map(Number);
     return new Date(y, m, 0).getDate();
+  }
+  function prevMonthKey(mk) {
+    const [y, m] = mk.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+  }
+  // Dépenses d'un mois jusqu'au jour `day` inclus (pour comparer "à date")
+  function expensesUpToDay(mk, day) {
+    return state.operations
+      .filter((o) => o.type === 'expense' && monthKey(o.date) === mk && Number(o.date.slice(8, 10)) <= day)
+      .reduce((s, o) => s + o.amount, 0);
   }
   // Jour effectif d'une récurrence ce mois-ci (ex. 31 → 30 en juin)
   function effectiveDay(r, mk) { return Math.min(r.day, daysInMonth(mk)); }
@@ -214,6 +250,8 @@
     $('#home-solde').textContent = fmt(solde);
     $('#home-saving').textContent = fmt(Math.max(solde, 0));
 
+    renderHomeAccounts();
+    renderInsight();
     renderHomePending();
     renderHomeBudgets();
 
@@ -221,6 +259,53 @@
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt))
       .slice(0, 5);
     renderOpList($('#home-recent'), recent, false);
+  }
+
+  // "Mes comptes" : solde de chaque compte (espèces, Wave, Orange Money, banque)
+  function renderHomeAccounts() {
+    const wrap = $('#home-accounts');
+    const row = $('#home-accounts-row');
+    if (!state.accounts.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    const total = state.accounts.reduce((s, a) => s + accountBalance(a.id), 0);
+    $('#home-accounts-total').textContent = fmt(total);
+    row.innerHTML = '';
+    state.accounts.forEach((a) => {
+      const card = document.createElement('div');
+      card.className = 'acc-card';
+      card.innerHTML = `
+        <span class="acc-card__icon" style="background:${a.color}1f">${a.icon}</span>
+        <span class="acc-card__name">${escapeHtml(a.name)}</span>
+        <span class="acc-card__bal">${fmt(accountBalance(a.id))}</span>`;
+      row.appendChild(card);
+    });
+  }
+
+  // Comparaison avec le mois dernier (à date) — ligne d'insight sur l'accueil
+  function renderInsight() {
+    const wrap = $('#home-insight');
+    const d = Number(todayISO().slice(8, 10));
+    const mk = currentMonthKey();
+    const cur = expensesUpToDay(mk, d);
+    const prev = expensesUpToDay(prevMonthKey(mk), d);
+    if (cur === 0 && prev === 0) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    if (prev === 0) {
+      wrap.className = 'home-insight insight--neutral';
+      wrap.innerHTML = '📊 Premier mois de suivi — continue&nbsp;!';
+      return;
+    }
+    const pct = Math.round(((cur - prev) / prev) * 100);
+    if (Math.abs(pct) < 3) {
+      wrap.className = 'home-insight insight--neutral';
+      wrap.innerHTML = '➖ Tu dépenses comme le mois dernier, à la même date.';
+    } else if (pct < 0) {
+      wrap.className = 'home-insight insight--good';
+      wrap.innerHTML = `📉 <strong>${Math.abs(pct)}% de dépenses en moins</strong> qu'au mois dernier à la même date. 👏`;
+    } else {
+      wrap.className = 'home-insight insight--bad';
+      wrap.innerHTML = `📈 <strong>${pct}% de dépenses en plus</strong> qu'au mois dernier à la même date.`;
+    }
   }
 
   // Carte "À confirmer ce mois" : récurrences dont le jour est arrivé
@@ -259,6 +344,7 @@
       id: uid(),
       amount,
       categoryId: r.categoryId,
+      accountId: r.accountId || (state.accounts[0] && state.accounts[0].id),
       type: r.type,
       date: dateISO,
       note: r.label,
@@ -452,6 +538,21 @@
     renderCatGrid();
   }
 
+  // Pastilles de choix du compte (Espèces / Wave / Orange Money / Banque)
+  function renderAccPills() {
+    const row = $('#add-acc-row');
+    if (!row) return;
+    row.innerHTML = '';
+    state.accounts.forEach((a) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'acc-pill' + (a.id === state.addAccountId ? ' is-active' : '');
+      b.innerHTML = `<span>${a.icon}</span>${escapeHtml(a.name)}`;
+      b.addEventListener('click', () => { state.addAccountId = a.id; renderAccPills(); });
+      row.appendChild(b);
+    });
+  }
+
   function resetAddForm() {
     $('#add-id').value = '';
     $('#add-amount').value = '';
@@ -461,6 +562,8 @@
     $('#add-save').textContent = 'Enregistrer';
     $('#add-delete').hidden = true;
     state.addCatId = null;
+    if (!accountById(state.addAccountId)) state.addAccountId = state.accounts[0] ? state.accounts[0].id : null;
+    renderAccPills();
     setAddType('expense');
   }
 
@@ -481,6 +584,8 @@
     $('#add-save').textContent = 'Enregistrer les modifications';
     $('#add-delete').hidden = false;
     state.addCatId = o.categoryId;
+    state.addAccountId = o.accountId || (state.accounts[0] && state.accounts[0].id);
+    renderAccPills();
     setAddType(o.type);
   }
 
@@ -495,6 +600,7 @@
       id,
       amount,
       categoryId: state.addCatId,
+      accountId: state.addAccountId || (state.accounts[0] && state.accounts[0].id),
       type: state.addType,
       date: $('#add-date').value || todayISO(),
       note: $('#add-note').value.trim(),
@@ -587,6 +693,45 @@
       <div class="rbilan__cell"><span>Revenus</span><strong class="is-in">${fmt(totalRev)}</strong></div>
       <div class="rbilan__cell"><span>Dépenses</span><strong class="is-out">${fmt(totalExp)}</strong></div>
       <div class="rbilan__cell"><span>Solde ${periodWord[state.histPeriod]}</span><strong>${fmt(totalRev - totalExp)}</strong></div>`;
+
+    // Comparaison avec le mois dernier (à date) — seulement en vue "mois"
+    const cmp = $('#report-compare');
+    if (state.histPeriod === 'month') {
+      const d = Number(todayISO().slice(8, 10));
+      const mk = currentMonthKey();
+      const pmk = prevMonthKey(mk);
+      const cur = expensesUpToDay(mk, d);
+      const prev = expensesUpToDay(pmk, d);
+      // top hausses par catégorie
+      const curByCat = {}, prevByCat = {};
+      state.operations.forEach((o) => {
+        if (o.type !== 'expense') return;
+        const day = Number(o.date.slice(8, 10));
+        if (monthKey(o.date) === mk && day <= d) curByCat[o.categoryId] = (curByCat[o.categoryId] || 0) + o.amount;
+        if (monthKey(o.date) === pmk && day <= d) prevByCat[o.categoryId] = (prevByCat[o.categoryId] || 0) + o.amount;
+      });
+      const movers = [...new Set([...Object.keys(curByCat), ...Object.keys(prevByCat)])]
+        .map((id) => ({ cat: catById(id), delta: (curByCat[id] || 0) - (prevByCat[id] || 0) }))
+        .filter((m) => m.cat && m.delta > 0)
+        .sort((a, b) => b.delta - a.delta)
+        .slice(0, 3);
+      if (cur === 0 && prev === 0) {
+        cmp.hidden = true;
+      } else {
+        cmp.hidden = false;
+        const pct = prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null;
+        const head = pct === null
+          ? `Premier mois de suivi : <strong>${fmt(cur)}</strong> dépensés à ce jour.`
+          : `À ce jour : <strong>${fmt(cur)}</strong> vs <strong>${fmt(prev)}</strong> le mois dernier <span class="cmp-tag ${pct > 0 ? 'cmp-tag--up' : 'cmp-tag--down'}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+        cmp.innerHTML = `
+          <h3 class="report-card__title">Comparaison avec le mois dernier</h3>
+          <p class="cmp-head">${head}</p>
+          ${movers.length ? '<p class="cmp-sub">Plus que le mois dernier sur&nbsp;:</p><ul class="cmp-movers">' +
+            movers.map((m) => `<li><span class="bgt__emoji" style="background:${m.cat.color}1f">${m.cat.icon}</span>${escapeHtml(m.cat.name)} <strong>+${fmt(m.delta)}</strong></li>`).join('') + '</ul>' : ''}`;
+      }
+    } else {
+      cmp.hidden = true;
+    }
 
     // Répartition par catégorie (camembert)
     const byCat = {};
@@ -844,6 +989,12 @@
     if (selectedId) sel.value = selectedId;
   }
 
+  function fillAccountSelect(sel, selectedId) {
+    sel.innerHTML = state.accounts
+      .map((a) => `<option value="${a.id}">${a.icon} ${escapeHtml(a.name)}</option>`).join('');
+    sel.value = selectedId || (state.accounts[0] && state.accounts[0].id) || '';
+  }
+
   function openRecurModal(r, presetType) {
     $('#recur-modal-id').value = r ? r.id : '';
     $('#recur-modal-title').textContent = r ? 'Modifier' : 'Nouvelle entrée';
@@ -853,6 +1004,7 @@
     const type = r ? r.type : (presetType || 'expense');
     $('#recur-modal-type').value = type;
     fillRecurCatSelect(type, r ? r.categoryId : null);
+    fillAccountSelect($('#recur-modal-acc'), r ? r.accountId : null);
     $('#recur-modal-remove').hidden = !r;
     $('#recur-modal').hidden = false;
   }
@@ -875,6 +1027,7 @@
       day,
       type: $('#recur-modal-type').value,
       categoryId: $('#recur-modal-cat').value,
+      accountId: $('#recur-modal-acc').value,
       active: true,
       posted: existing ? (existing.posted || []) : [],
       payments: existing ? (existing.payments || {}) : {},
@@ -897,8 +1050,73 @@
     toast('Supprimé');
   }
 
+  /* ---------------- Réglages : comptes ---------------- */
+  function renderAccountsSettings() {
+    const ul = $('#account-list');
+    ul.innerHTML = '';
+    state.accounts.forEach((a) => {
+      const li = document.createElement('li');
+      li.className = 'cat-row';
+      li.innerHTML = `
+        <span class="cat-row__emoji">${a.icon}</span>
+        <span class="recur-row__main">
+          <span class="recur-row__label">${escapeHtml(a.name)}</span>
+          <span class="recur-row__meta">Solde : ${fmt(accountBalance(a.id))}</span>
+        </span>
+        <button class="cat-row__btn edit" title="Modifier">✏️</button>
+        <button class="cat-row__btn del" title="Supprimer">🗑️</button>`;
+      li.querySelector('.edit').addEventListener('click', () => openAccountModal(a));
+      li.querySelector('.del').addEventListener('click', () => removeAccount(a));
+      ul.appendChild(li);
+    });
+  }
+
+  function openAccountModal(a) {
+    $('#account-modal-id').value = a ? a.id : '';
+    $('#account-modal-title').textContent = a ? 'Modifier le compte' : 'Nouveau compte';
+    $('#account-modal-name').value = a ? a.name : '';
+    $('#account-modal-icon').value = a ? a.icon : '';
+    $('#account-modal-opening').value = a && a.opening ? a.opening.toLocaleString('fr-FR') : '';
+    $('#account-modal-remove').hidden = !a;
+    $('#account-modal').hidden = false;
+  }
+  function closeAccountModal() { $('#account-modal').hidden = true; }
+
+  async function saveAccount() {
+    const name = $('#account-modal-name').value.trim();
+    if (!name) return toast('Donne un nom');
+    const id = $('#account-modal-id').value || ('a-' + uid());
+    const existing = accountById(id);
+    const acc = {
+      id,
+      name,
+      icon: $('#account-modal-icon').value.trim() || (existing ? existing.icon : '👛'),
+      color: existing ? existing.color : PALETTE[state.accounts.length % PALETTE.length],
+      opening: parseAmount($('#account-modal-opening').value),
+      order: existing ? existing.order : (Math.max(0, ...state.accounts.map((x) => x.order ?? 0)) + 1),
+    };
+    await put('accounts', acc);
+    if (existing) Object.assign(existing, acc);
+    else state.accounts.push(acc);
+    closeAccountModal();
+    renderSettings();
+    toast('Compte enregistré ✓');
+  }
+
+  async function removeAccount(a) {
+    if (state.accounts.length <= 1) return alert('Garde au moins un compte.');
+    const used = state.operations.some((o) => o.accountId === a.id);
+    if (used) return alert('Ce compte est utilisé par des opérations. Réaffecte-les d’abord.');
+    if (!confirm(`Supprimer le compte « ${a.name} » ?`)) return;
+    await del('accounts', a.id);
+    state.accounts = state.accounts.filter((x) => x.id !== a.id);
+    renderSettings();
+    toast('Compte supprimé');
+  }
+
   /* ---------------- Réglages : catégories ---------------- */
   function renderSettings() {
+    renderAccountsSettings();
     renderRecurrents();
     ['expense', 'income'].forEach((type) => {
       const ul = $(`#cat-list-${type}`);
@@ -994,6 +1212,19 @@
     $('#cat-modal-save').addEventListener('click', saveCatModal);
     $$('[data-close-modal]').forEach((b) => b.addEventListener('click', closeCatModal));
 
+    // comptes
+    $('#add-account-btn').addEventListener('click', () => openAccountModal(null));
+    $('#account-modal-save').addEventListener('click', saveAccount);
+    $('#account-modal-remove').addEventListener('click', () => {
+      const a = accountById($('#account-modal-id').value);
+      if (a) { closeAccountModal(); removeAccount(a); }
+    });
+    $$('[data-close-account]').forEach((b) => b.addEventListener('click', closeAccountModal));
+    $('#account-modal-opening').addEventListener('input', (e) => {
+      const n = parseAmount(e.target.value);
+      e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+    });
+
     // sauvegarde + installation
     $('#export-btn').addEventListener('click', exportData);
     $('#import-btn').addEventListener('click', () => $('#import-file').click());
@@ -1059,7 +1290,7 @@
   }
 
   /* ---------------- Sauvegarde : export / import ---------------- */
-  const BACKUP_STORES = ['categories', 'operations', 'budgets', 'recurrents'];
+  const BACKUP_STORES = ['categories', 'operations', 'budgets', 'recurrents', 'accounts'];
 
   async function exportData() {
     const data = { app: 'nafa', version: 1, exportedAt: new Date().toISOString() };
@@ -1132,6 +1363,22 @@
     state.operations = await getAll('operations');
     state.budgets = await getAll('budgets');
     state.recurrents = await getAll('recurrents');
+
+    // Comptes : seed si vide, puis migration des opérations sans compte
+    let accounts = await getAll('accounts');
+    if (!accounts.length) {
+      accounts = DEFAULT_ACCOUNTS.map((a) => ({ ...a }));
+      for (const a of accounts) await put('accounts', a);
+    }
+    accounts.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    state.accounts = accounts;
+    const defaultAcc = accounts[0] ? accounts[0].id : null;
+    for (const o of state.operations) {
+      if (o.accountId === undefined) {
+        o.accountId = defaultAcc;
+        await put('operations', o);
+      }
+    }
 
     // période historique par défaut = mois
     $$('[data-period]').forEach((x) => x.classList.toggle('is-active', x.dataset.period === 'month'));

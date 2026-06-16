@@ -53,6 +53,16 @@
         </div>
       </div>
 
+      <div class="home-accounts" id="home-accounts" hidden>
+        <div class="section-head">
+          <h2>Mes comptes</h2>
+          <span class="home-accounts__total">Total : <strong id="home-accounts-total">—</strong></span>
+        </div>
+        <div class="acc-cards" id="home-accounts-row"></div>
+      </div>
+
+      <div class="home-insight" id="home-insight" hidden></div>
+
       <div class="home-pending" id="home-pending" hidden>
         <div class="section-head">
           <h2>À confirmer ce mois</h2>
@@ -97,6 +107,9 @@
 
         <p class="field-label">Catégorie</p>
         <div class="cat-grid" id="add-cat-grid"></div>
+
+        <p class="field-label">Compte</p>
+        <div class="acc-row" id="add-acc-row"></div>
 
         <div class="row-fields">
           <label class="field">
@@ -150,6 +163,7 @@
       <!-- Vue Rapports -->
       <div id="history-report-view" hidden>
         <div class="report-bilan" id="report-bilan"></div>
+        <div class="report-compare" id="report-compare" hidden></div>
         <div class="report-card">
           <h3 class="report-card__title">Où part mon argent</h3>
           <div id="report-donut"></div>
@@ -187,6 +201,11 @@
       <header class="app-header">
         <h1 class="app-header__title">Réglages</h1>
       </header>
+
+      <div class="section-head"><h2>Mes comptes</h2></div>
+      <p class="hint">Espèces, Wave, Orange Money, Banque… Choisis le compte à chaque opération&nbsp;: l'app suit le solde de chacun. Mets un «&nbsp;solde de départ&nbsp;» pour partir du bon montant.</p>
+      <ul class="recur-list" id="account-list"></ul>
+      <button class="btn btn--ghost full" id="add-account-btn">+ Nouveau compte</button>
 
       <div class="section-head"><h2>Charges fixes &amp; revenus récurrents</h2></div>
       <p class="hint">Loyer, salaire, abonnements… Définis-les une fois&nbsp;: chaque mois, dès le jour venu, l'app te les proposera sur l'accueil — tu confirmes (ou ajustes le montant).</p>
@@ -326,10 +345,42 @@
           <input id="recur-modal-day" type="number" min="1" max="31" placeholder="5" />
         </label>
       </div>
+      <label class="field">
+        <span class="field-label">Compte</span>
+        <select id="recur-modal-acc" class="select"></select>
+      </label>
       <div class="add-actions">
         <button type="button" class="btn btn--ghost danger" id="recur-modal-remove" hidden>Supprimer</button>
         <button type="button" class="btn btn--ghost" data-close-recur>Annuler</button>
         <button type="button" class="btn btn--primary" id="recur-modal-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== Modale compte ====================== -->
+  <div class="modal" id="account-modal" hidden>
+    <div class="modal__backdrop" data-close-account></div>
+    <div class="modal__card">
+      <h3 id="account-modal-title">Nouveau compte</h3>
+      <input type="hidden" id="account-modal-id" />
+      <div class="row-fields">
+        <label class="field" style="flex:2">
+          <span class="field-label">Nom</span>
+          <input type="text" id="account-modal-name" maxlength="24" placeholder="ex. Wave, Banque…" />
+        </label>
+        <label class="field">
+          <span class="field-label">Icône</span>
+          <input type="text" id="account-modal-icon" maxlength="2" placeholder="🌊" />
+        </label>
+      </div>
+      <label class="field">
+        <span class="field-label">Solde de départ (FCFA)</span>
+        <input id="account-modal-opening" inputmode="numeric" pattern="[0-9 ]*" placeholder="0" />
+      </label>
+      <div class="add-actions">
+        <button type="button" class="btn btn--ghost danger" id="account-modal-remove" hidden>Supprimer</button>
+        <button type="button" class="btn btn--ghost" data-close-account>Annuler</button>
+        <button type="button" class="btn btn--primary" id="account-modal-save">Enregistrer</button>
       </div>
     </div>
   </div>

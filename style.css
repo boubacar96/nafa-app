@@ -247,6 +247,44 @@ button{font-family:inherit;cursor:pointer}
 .cat-row__btn{background:none;border:none;font-size:1.05rem;padding:5px 6px;color:var(--muted)}
 .cat-row__btn.del{color:var(--out)}
 
+/* ---------- Comptes (Mobile Money) ---------- */
+.home-accounts{margin-bottom:18px}
+.home-accounts__total{font-size:.82rem;color:var(--muted);font-weight:600}
+.home-accounts__total strong{color:var(--ink);font-weight:800}
+.acc-cards{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.acc-cards::-webkit-scrollbar{display:none}
+.acc-card{flex:0 0 auto;min-width:120px;background:var(--card);border:1px solid var(--line);
+  border-radius:16px;padding:12px 14px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:5px}
+.acc-card__icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:1.1rem}
+.acc-card__name{font-size:.76rem;color:var(--muted);font-weight:700}
+.acc-card__bal{font-size:1rem;font-weight:800;white-space:nowrap}
+
+/* pastilles de compte (écran Ajouter) */
+.acc-row{display:flex;flex-wrap:wrap;gap:8px}
+.acc-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);
+  border-radius:20px;padding:9px 14px;font-weight:700;font-size:.85rem;color:var(--ink)}
+.acc-pill span{font-size:1rem}
+.acc-pill.is-active{border-color:var(--teal);background:var(--teal-soft);box-shadow:0 0 0 2px var(--teal-soft)}
+
+/* ---------- Insight comparaison (accueil) ---------- */
+.home-insight{border-radius:14px;padding:12px 15px;font-size:.86rem;font-weight:600;margin-bottom:16px;line-height:1.35}
+.insight--good{background:#e1f5ee;color:#0b5e4d;border:1px solid #bfe7d9}
+.insight--bad{background:#fdeef0;color:#a93444;border:1px solid #f6d2d8}
+.insight--neutral{background:#eef2f0;color:var(--muted);border:1px solid var(--line)}
+
+/* ---------- Comparaison (rapports) ---------- */
+.report-compare{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;
+  box-shadow:var(--shadow-soft);margin-bottom:14px}
+.cmp-head{margin:0;font-size:.94rem;line-height:1.5}
+.cmp-tag{display:inline-block;font-size:.74rem;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:4px}
+.cmp-tag--up{background:#fdeef0;color:var(--out)}
+.cmp-tag--down{background:#e1f5ee;color:var(--in)}
+.cmp-sub{margin:14px 0 8px;font-size:.8rem;color:var(--muted);font-weight:700}
+.cmp-movers{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.cmp-movers li{display:flex;align-items:center;gap:9px;font-size:.9rem;font-weight:600}
+.cmp-movers li strong{margin-left:auto;color:var(--out)}
+.cmp-movers .bgt__emoji{font-size:1rem;width:28px;height:28px;display:grid;place-items:center;border-radius:9px}
+
 /* ---------- "À confirmer ce mois" ---------- */
 .home-pending{margin-bottom:8px}
 .pending{
