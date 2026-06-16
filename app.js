@@ -118,6 +118,7 @@
     histPeriod: 'month',
     histCat: 'all',
     histView: 'list',
+    viewMonth: null, // mois affiché sur l'accueil/rapports (null = mois courant)
   };
 
   /* ---------------- Helpers ---------------- */
@@ -231,6 +232,7 @@
 
   /* ---------------- Navigation ---------------- */
   function goto(screen) {
+    state.viewMonth = currentMonthKey(); // on repart toujours du mois courant
     $$('.screen').forEach((s) => { s.hidden = s.dataset.screen !== screen; });
     $$('.tabbar__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.goto === screen));
     window.scrollTo(0, 0);
@@ -241,10 +243,26 @@
     if (screen === 'add' && !$('#add-id').value) resetAddForm();
   }
 
+  // Navigation entre les mois (accueil + rapports). delta = -1 (précédent) / +1 (suivant)
+  function shiftMonth(delta) {
+    const cur = currentMonthKey();
+    const [y, m] = (state.viewMonth || cur).split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    const nm = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+    if (nm > cur) return;            // pas de mois futur
+    state.viewMonth = nm;
+    if (!$('#screen-home').hidden) renderHome();
+    if (!$('#screen-history').hidden) renderHistoryScreen();
+  }
+
   /* ---------------- Accueil ---------------- */
   function renderHome() {
-    const mk = currentMonthKey();
+    const mk = state.viewMonth || currentMonthKey();
+    const isCurrent = mk === currentMonthKey();
     $('#home-month').textContent = monthLabel(mk);
+    $('#home-month-next').disabled = isCurrent;
+    $('#home-kicker').textContent = isCurrent ? 'Bonjour 👋' : 'Mois passé';
+
     const ops = state.operations.filter((o) => monthKey(o.date) === mk);
     const revenus = ops.filter((o) => o.type === 'income').reduce((s, o) => s + o.amount, 0);
     const depenses = ops.filter((o) => o.type === 'expense').reduce((s, o) => s + o.amount, 0);
@@ -255,14 +273,25 @@
     $('#home-solde').textContent = fmt(solde);
     $('#home-saving').textContent = fmt(Math.max(solde, 0));
 
-    renderHomeAccounts();
-    renderInsight();
-    renderHomePending();
-    renderHomeBudgets();
+    renderHomeAccounts(); // soldes des comptes = toujours actuels (toutes périodes)
 
-    const recent = [...state.operations]
+    // Sections "mois en cours" uniquement (alertes, à confirmer, comparaison)
+    if (isCurrent) {
+      renderInsight();
+      renderHomePending();
+      renderHomeBudgets();
+    } else {
+      $('#home-insight').hidden = true;
+      $('#home-pending').hidden = true;
+      $('#home-budgets').hidden = true;
+    }
+
+    $('#home-recent-title').textContent = isCurrent
+      ? 'Dernières opérations'
+      : 'Opérations de ' + MONTHS_FR[Number(mk.split('-')[1]) - 1].toLowerCase();
+    const recent = [...ops]
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt))
-      .slice(0, 5);
+      .slice(0, 6);
     renderOpList($('#home-recent'), recent, false);
   }
 
@@ -684,7 +713,7 @@
   function periodFilter(ops) {
     const t = todayISO();
     if (state.histPeriod === 'day') return ops.filter((o) => o.date === t);
-    if (state.histPeriod === 'month') return ops.filter((o) => monthKey(o.date) === currentMonthKey());
+    if (state.histPeriod === 'month') return ops.filter((o) => monthKey(o.date) === (state.viewMonth || currentMonthKey()));
     if (state.histPeriod === 'week') {
       const now = new Date(t + 'T00:00:00');
       const day = (now.getDay() + 6) % 7; // lundi = 0
@@ -734,6 +763,16 @@
   const compact = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(Math.round(n)));
 
   function renderReports() {
+    // Navigateur de mois (visible seulement en vue "mois")
+    const monthMode = state.histPeriod === 'month';
+    const mk = state.viewMonth || currentMonthKey();
+    const nav = $('#report-month-nav');
+    nav.hidden = !monthMode;
+    if (monthMode) {
+      $('#report-month').textContent = monthLabel(mk);
+      $('#report-month-next').disabled = mk === currentMonthKey();
+    }
+
     const ops = periodFilter(state.operations);
     const exp = ops.filter((o) => o.type === 'expense');
     const totalExp = exp.reduce((s, o) => s + o.amount, 0);
@@ -745,11 +784,10 @@
       <div class="rbilan__cell"><span>Dépenses</span><strong class="is-out">${fmt(totalExp)}</strong></div>
       <div class="rbilan__cell"><span>Solde ${periodWord[state.histPeriod]}</span><strong>${fmt(totalRev - totalExp)}</strong></div>`;
 
-    // Comparaison avec le mois dernier (à date) — seulement en vue "mois"
+    // Comparaison avec le mois dernier (à date) — seulement sur le mois en cours
     const cmp = $('#report-compare');
-    if (state.histPeriod === 'month') {
+    if (state.histPeriod === 'month' && mk === currentMonthKey()) {
       const d = Number(todayISO().slice(8, 10));
-      const mk = currentMonthKey();
       const pmk = prevMonthKey(mk);
       const cur = expensesUpToDay(mk, d);
       const prev = expensesUpToDay(pmk, d);
@@ -1248,6 +1286,12 @@
       state.histView = b.dataset.view;
       renderHistoryScreen();
     }));
+
+    // navigation entre les mois (accueil + rapports)
+    $('#home-month-prev').addEventListener('click', () => shiftMonth(-1));
+    $('#home-month-next').addEventListener('click', () => shiftMonth(1));
+    $('#report-month-prev').addEventListener('click', () => shiftMonth(-1));
+    $('#report-month-next').addEventListener('click', () => shiftMonth(1));
 
     $$('.type-toggle__btn').forEach((b) => b.addEventListener('click', () => setAddType(b.dataset.type)));
     $('#add-form').addEventListener('submit', saveOperation);

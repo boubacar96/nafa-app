@@ -87,6 +87,18 @@ button{font-family:inherit;cursor:pointer}
   box-shadow:var(--shadow-color);
 }
 
+/* ---------- Navigateur de mois ---------- */
+.month-nav{display:flex;align-items:center;gap:6px}
+.month-nav__btn{width:30px;height:30px;border-radius:10px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);font-size:1.2rem;font-weight:700;line-height:1;
+  display:grid;place-items:center;box-shadow:var(--shadow-soft)}
+.month-nav__btn:disabled{opacity:.35}
+.month-nav__btn:active:not(:disabled){background:var(--surface-2)}
+.month-nav__label{font-weight:800;font-size:1.05rem}
+.month-nav--report{justify-content:space-between;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:8px 10px;margin-bottom:14px;box-shadow:var(--shadow-soft)}
+.month-nav--report .month-nav__btn{box-shadow:none;border-color:transparent;background:var(--surface-2)}
+
 /* ---------- Carte solde ---------- */
 .balance-card{
   position:relative;overflow:hidden;

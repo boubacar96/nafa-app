@@ -20,8 +20,12 @@
     <section class="screen" id="screen-home" data-screen="home">
       <header class="app-header">
         <div>
-          <p class="app-header__kicker">Bonjour 👋</p>
-          <h1 class="app-header__title" id="home-month">Ce mois</h1>
+          <p class="app-header__kicker" id="home-kicker">Bonjour 👋</p>
+          <div class="month-nav">
+            <button class="month-nav__btn" id="home-month-prev" aria-label="Mois précédent">‹</button>
+            <h1 class="app-header__title" id="home-month">Ce mois</h1>
+            <button class="month-nav__btn" id="home-month-next" aria-label="Mois suivant">›</button>
+          </div>
         </div>
         <span class="brand-badge">N</span>
       </header>
@@ -81,7 +85,7 @@
       </div>
 
       <div class="section-head">
-        <h2>Dernières opérations</h2>
+        <h2 id="home-recent-title">Dernières opérations</h2>
         <button class="link-btn" data-goto="history">Tout voir →</button>
       </div>
       <ul class="op-list" id="home-recent"></ul>
@@ -181,6 +185,11 @@
 
       <!-- Vue Rapports -->
       <div id="history-report-view" hidden>
+        <div class="month-nav month-nav--report" id="report-month-nav" hidden>
+          <button class="month-nav__btn" id="report-month-prev" aria-label="Mois précédent">‹</button>
+          <span class="month-nav__label" id="report-month">Ce mois</span>
+          <button class="month-nav__btn" id="report-month-next" aria-label="Mois suivant">›</button>
+        </div>
         <div class="report-bilan" id="report-bilan"></div>
         <div class="report-compare" id="report-compare" hidden></div>
         <div class="report-card">
