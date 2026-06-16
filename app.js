@@ -87,41 +87,9 @@
     { name: 'Autre revenu',   icon: '➕', color: '#84cc16', type: 'income' },
   ];
 
-  /* ---------------- Familles (regroupement) ---------------- */
-  const DEFAULT_GROUPS = [
-    { id: 'g-maison',      name: 'Maison',            icon: '🏠', order: 0 },
-    { id: 'g-quotidien',   name: 'Quotidien',         icon: '🍚', order: 1 },
-    { id: 'g-factures',    name: 'Factures',          icon: '⚡', order: 2 },
-    { id: 'g-abonnements', name: 'Abonnements',       icon: '📱', order: 3 },
-    { id: 'g-famille',     name: 'Famille & Social',  icon: '👨‍👩‍👧', order: 4 },
-    { id: 'g-sante',       name: 'Santé',             icon: '🏥', order: 5 },
-    { id: 'g-loisirs',     name: 'Loisirs & Achats',  icon: '🛍️', order: 6 },
-    { id: 'g-epargne',     name: 'Épargne',           icon: '💰', order: 7 },
-    { id: 'g-revenus',     name: 'Revenus',           icon: '💼', order: 8 },
-  ];
-  // Famille par défaut des catégories de base (par nom)
-  const DEFAULT_CAT_GROUP = {
-    'Loyer / Maison': 'g-maison',
-    'Factures': 'g-factures',
-    'Alimentation': 'g-quotidien',
-    'Transport': 'g-quotidien',
-    'Famille': 'g-famille',
-    'Scolarité': 'g-famille',
-    'Santé': 'g-sante',
-    'Crédit tél.': 'g-abonnements',
-    'Achats': 'g-loisirs',
-    'Loisirs': 'g-loisirs',
-    'Épargne/Tontine': 'g-epargne',
-    'Salaire': 'g-revenus',
-    'Business': 'g-revenus',
-    'Aide': 'g-revenus',
-    'Autre revenu': 'g-revenus',
-  };
-
   /* ---------------- État ---------------- */
   const state = {
     categories: [],
-    groups: [],
     operations: [],
     budgets: [],
     recurrents: [],
@@ -164,17 +132,6 @@
   }
   function catById(id) { return state.categories.find((c) => c.id === id); }
   function budgetFor(catId) { return state.budgets.find((b) => b.categoryId === catId); }
-  function groupById(id) { return state.groups.find((g) => g.id === id); }
-
-  // Regroupe une liste de catégories par famille (dans l'ordre des familles),
-  // avec un seau "Autres" pour les catégories sans famille. Familles vides ignorées.
-  function groupCategories(cats) {
-    const ordered = [...state.groups].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-    const buckets = ordered.map((g) => ({ group: g, cats: cats.filter((c) => c.groupId === g.id) }));
-    const ungrouped = cats.filter((c) => !c.groupId || !groupById(c.groupId));
-    if (ungrouped.length) buckets.push({ group: { id: null, name: 'Autres', icon: '🏷️' }, cats: ungrouped });
-    return buckets.filter((b) => b.cats.length);
-  }
   function recurrentById(id) { return state.recurrents.find((r) => r.id === id); }
 
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -287,6 +244,39 @@
     });
   }
 
+  // Crée l'opération d'une récurrence pour le mois en cours et la marque "payée/confirmée"
+  async function postRecurrent(r, amount, dateISO) {
+    const mk = currentMonthKey();
+    const op = {
+      id: uid(),
+      amount,
+      categoryId: r.categoryId,
+      type: r.type,
+      date: dateISO,
+      note: r.label,
+      createdAt: new Date().toISOString(),
+    };
+    await put('operations', op);
+    state.operations.push(op);
+    r.posted = [...(r.posted || []), mk];
+    r.payments = { ...(r.payments || {}), [mk]: op.id };
+    await put('recurrents', r);
+    return op;
+  }
+
+  // Annule le paiement/confirmation du mois (supprime l'opération créée)
+  async function unpostRecurrent(r) {
+    const mk = currentMonthKey();
+    const opId = (r.payments || {})[mk];
+    if (opId) {
+      await del('operations', opId);
+      state.operations = state.operations.filter((o) => o.id !== opId);
+    }
+    r.posted = (r.posted || []).filter((m) => m !== mk);
+    if (r.payments) delete r.payments[mk];
+    await put('recurrents', r);
+  }
+
   async function confirmRecurrent(id) {
     const r = recurrentById(id);
     if (!r) return;
@@ -294,22 +284,29 @@
     const input = document.querySelector(`[data-recur-amount="${id}"]`);
     const amount = input ? parseAmount(input.value) : r.amount;
     if (amount <= 0) return toast('Montant invalide');
-    const day = effectiveDay(r, mk);
-    const op = {
-      id: uid(),
-      amount,
-      categoryId: r.categoryId,
-      type: r.type,
-      date: `${mk}-${pad2(day)}`,
-      note: r.label,
-      createdAt: new Date().toISOString(),
-    };
-    await put('operations', op);
-    state.operations.push(op);
-    r.posted = [...(r.posted || []), mk];
-    await put('recurrents', r);
+    await postRecurrent(r, amount, `${mk}-${pad2(effectiveDay(r, mk))}`);
     toast(r.type === 'income' ? 'Revenu ajouté ✓' : 'Charge ajoutée ✓');
     renderHome();
+  }
+
+  // Payer une facture/abonnement depuis l'écran Budgets (montant ajustable, daté du jour)
+  async function payBill(id) {
+    const r = recurrentById(id);
+    if (!r) return;
+    const input = document.querySelector(`[data-bill-amount="${id}"]`);
+    const amount = input ? parseAmount(input.value) : r.amount;
+    if (amount <= 0) return toast('Montant invalide');
+    await postRecurrent(r, amount, todayISO());
+    toast('Payé ✓ — déduit du solde');
+    renderBudgets();
+  }
+
+  async function unpayBill(id) {
+    const r = recurrentById(id);
+    if (!r) return;
+    await unpostRecurrent(r);
+    toast('Paiement annulé');
+    renderBudgets();
   }
 
   async function skipRecurrent(id) {
@@ -559,6 +556,8 @@
 
   /* ---------------- Écran Budgets ---------------- */
   function renderBudgets() {
+    renderBills();
+
     const spent = spentMap();
     const expCats = state.categories.filter((c) => c.type === 'expense');
     const budgeted = expCats
@@ -566,6 +565,7 @@
       .map((c) => ({ cat: c, limit: budgetFor(c.id).limit, spent: spent[c.id] || 0 }))
       .map((r) => ({ ...r, st: budgetStatus(r.spent, r.limit) }))
       .sort((a, b) => b.st.ratio - a.st.ratio);
+    const unbudgeted = expCats.filter((c) => !budgetFor(c.id));
 
     // Résumé
     const totalLimit = budgeted.reduce((s, r) => s + r.limit, 0);
@@ -582,36 +582,90 @@
       summary.hidden = true;
     }
 
-    // Liste regroupée par famille
     const list = $('#budget-list');
     list.innerHTML = '';
 
-    groupCategories(expCats).forEach(({ group, cats }) => {
-      const head = document.createElement('li');
-      head.className = 'budget-sub';
-      head.innerHTML = `<span class="budget-sub__icon">${group.icon || ''}</span>${escapeHtml(group.name)}`;
-      list.appendChild(head);
+    if (budgeted.length) {
+      const h = document.createElement('li');
+      h.className = 'budget-sub';
+      h.textContent = 'Budgets fixés';
+      list.appendChild(h);
+      budgeted.forEach((r) => list.appendChild(budgetBar(r, false)));
+    }
 
-      // budgétées d'abord (avec barre), puis à définir
-      const withB = cats.filter((c) => budgetFor(c.id));
-      const withoutB = cats.filter((c) => !budgetFor(c.id));
+    const h2 = document.createElement('li');
+    h2.className = 'budget-sub';
+    h2.textContent = budgeted.length ? 'Ajouter un budget' : 'Choisis une catégorie à plafonner';
+    list.appendChild(h2);
 
-      withB
-        .map((c) => ({ cat: c, limit: budgetFor(c.id).limit, spent: spent[c.id] || 0 }))
-        .map((r) => ({ ...r, st: budgetStatus(r.spent, r.limit) }))
-        .sort((a, b) => b.st.ratio - a.st.ratio)
-        .forEach((r) => list.appendChild(budgetBar(r, false)));
+    unbudgeted.forEach((c) => {
+      const li = document.createElement('li');
+      li.className = 'budget-add-row tappable';
+      li.innerHTML = `
+        <span class="bgt__emoji" style="background:${c.color}1f">${c.icon}</span>
+        <span class="budget-add-row__name">${escapeHtml(c.name)}</span>
+        <span class="budget-add-row__cta">Définir +</span>`;
+      li.addEventListener('click', () => openBudgetModal(c));
+      list.appendChild(li);
+    });
+  }
 
-      withoutB.forEach((c) => {
-        const li = document.createElement('li');
-        li.className = 'budget-add-row tappable';
-        li.innerHTML = `
-          <span class="bgt__emoji" style="background:${c.color}1f">${c.icon}</span>
-          <span class="budget-add-row__name">${escapeHtml(c.name)}</span>
-          <span class="budget-add-row__cta">Définir +</span>`;
-        li.addEventListener('click', () => openBudgetModal(c));
-        list.appendChild(li);
-      });
+  /* ---------------- Budgets : factures & abonnements ---------------- */
+  function renderBills() {
+    const mk = currentMonthKey();
+    const bills = state.recurrents
+      .filter((r) => r.type === 'expense')
+      .sort((a, b) => a.day - b.day);
+    const summary = $('#bills-summary');
+    const list = $('#bills-list');
+    list.innerHTML = '';
+
+    if (!bills.length) {
+      summary.hidden = true;
+      list.innerHTML = '<li class="hint" style="margin:0 2px">Aucune facture ni abonnement. Ajoute Internet, SENELEC/WOYOFAL, loyer, gardiennage…</li>';
+      return;
+    }
+
+    const isPaid = (b) => (b.posted || []).includes(mk);
+    const paidAmount = (b) => {
+      const opId = (b.payments || {})[mk];
+      const op = opId && state.operations.find((o) => o.id === opId);
+      return op ? op.amount : b.amount;
+    };
+    const remaining = bills.filter((b) => !isPaid(b)).reduce((s, b) => s + b.amount, 0);
+    const paid = bills.filter(isPaid).reduce((s, b) => s + paidAmount(b), 0);
+
+    summary.hidden = false;
+    summary.innerHTML = `
+      <div class="bills-summary__row">
+        <span>Reste à payer ce mois</span><strong>${fmt(remaining)}</strong>
+      </div>
+      <div class="bills-summary__sub">Déjà payé : ${fmt(paid)} · ${bills.filter(isPaid).length}/${bills.length} réglé${bills.length > 1 ? 's' : ''}</div>`;
+
+    bills.forEach((b) => {
+      const c = catById(b.categoryId);
+      const li = document.createElement('li');
+      li.className = 'bill' + (isPaid(b) ? ' bill--paid' : '');
+      const head = `
+        <div class="bill__top">
+          <button class="bill__id" data-bill-edit="${b.id}">
+            <span class="bgt__emoji" style="background:${(c?.color || '#999')}1f">${c?.icon || '🧾'}</span>
+            <span class="bill__name">${escapeHtml(b.label)}</span>
+          </button>
+          ${isPaid(b) ? '<span class="bill__badge">✓ Payé</span>' : `<span class="bill__day">le ${b.day}</span>`}
+        </div>`;
+      const action = isPaid(b)
+        ? `<div class="bill__paidrow"><span class="bill__paidamt">${fmt(paidAmount(b))}</span>
+             <button class="bill__undo" data-bill-unpay="${b.id}">Annuler</button></div>`
+        : `<div class="bill__action">
+             <label class="pending__amount">
+               <input inputmode="numeric" pattern="[0-9 ]*" value="${b.amount.toLocaleString('fr-FR')}" data-bill-amount="${b.id}" />
+               <span>FCFA</span>
+             </label>
+             <button class="btn btn--primary bill__pay" data-bill-pay="${b.id}">Payer</button>
+           </div>`;
+      li.innerHTML = head + action;
+      list.appendChild(li);
     });
   }
 
@@ -686,13 +740,13 @@
     if (selectedId) sel.value = selectedId;
   }
 
-  function openRecurModal(r) {
+  function openRecurModal(r, presetType) {
     $('#recur-modal-id').value = r ? r.id : '';
-    $('#recur-modal-title').textContent = r ? 'Modifier la récurrence' : 'Nouvelle récurrence';
+    $('#recur-modal-title').textContent = r ? 'Modifier' : 'Nouvelle entrée';
     $('#recur-modal-label').value = r ? r.label : '';
     $('#recur-modal-amount').value = r ? r.amount.toLocaleString('fr-FR') : '';
     $('#recur-modal-day').value = r ? r.day : 1;
-    const type = r ? r.type : 'expense';
+    const type = r ? r.type : (presetType || 'expense');
     $('#recur-modal-type').value = type;
     fillRecurCatSelect(type, r ? r.categoryId : null);
     $('#recur-modal-remove').hidden = !r;
@@ -719,138 +773,53 @@
       categoryId: $('#recur-modal-cat').value,
       active: true,
       posted: existing ? (existing.posted || []) : [],
+      payments: existing ? (existing.payments || {}) : {},
     };
     await put('recurrents', rec);
     if (existing) Object.assign(existing, rec);
     else state.recurrents.push(rec);
     closeRecurModal();
     renderRecurrents();
-    toast('Récurrence enregistrée ✓');
+    renderBills();
+    toast('Enregistré ✓');
   }
 
   async function removeRecurrent(r) {
-    if (!confirm(`Supprimer la récurrence « ${r.label} » ?`)) return;
+    if (!confirm(`Supprimer « ${r.label} » ?`)) return;
     await del('recurrents', r.id);
     state.recurrents = state.recurrents.filter((x) => x.id !== r.id);
     renderRecurrents();
-    toast('Récurrence supprimée');
-  }
-
-  /* ---------------- Réglages : familles (regroupement) ---------------- */
-  function renderGroups() {
-    const ul = $('#group-list');
-    ul.innerHTML = '';
-    [...state.groups]
-      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
-      .forEach((g) => {
-        const count = state.categories.filter((c) => c.groupId === g.id).length;
-        const li = document.createElement('li');
-        li.className = 'group-row';
-        li.innerHTML = `
-          <span class="group-row__emoji">${g.icon || '🏷️'}</span>
-          <span class="group-row__main">
-            <span class="group-row__name">${escapeHtml(g.name)}</span>
-            <span class="group-row__meta">${count} catégorie${count > 1 ? 's' : ''}</span>
-          </span>
-          <button class="cat-row__btn edit" title="Renommer">✏️</button>
-          <button class="cat-row__btn del" title="Supprimer">🗑️</button>`;
-        li.querySelector('.edit').addEventListener('click', () => openGroupModal(g));
-        li.querySelector('.del').addEventListener('click', () => removeGroup(g));
-        ul.appendChild(li);
-      });
-  }
-
-  function openGroupModal(g) {
-    $('#group-modal-id').value = g ? g.id : '';
-    $('#group-modal-name').value = g ? g.name : '';
-    $('#group-modal-icon').value = g ? g.icon : '';
-    $('#group-modal-title').textContent = g ? 'Renommer la famille' : 'Nouvelle famille';
-    $('#group-modal-remove').hidden = !g;
-    $('#group-modal').hidden = false;
-  }
-  function closeGroupModal() { $('#group-modal').hidden = true; }
-
-  async function saveGroup() {
-    const name = $('#group-modal-name').value.trim();
-    if (!name) return toast('Donne un nom');
-    const id = $('#group-modal-id').value || ('g-' + uid());
-    const existing = groupById(id);
-    const g = {
-      id,
-      name,
-      icon: $('#group-modal-icon').value.trim() || (existing ? existing.icon : '🏷️'),
-      order: existing ? existing.order : (Math.max(0, ...state.groups.map((x) => x.order ?? 0)) + 1),
-    };
-    await put('groups', g);
-    if (existing) Object.assign(existing, g);
-    else state.groups.push(g);
-    closeGroupModal();
-    renderSettings();
-    toast('Famille enregistrée ✓');
-  }
-
-  async function removeGroup(g) {
-    const count = state.categories.filter((c) => c.groupId === g.id).length;
-    const msg = count
-      ? `Supprimer la famille « ${g.name} » ? Ses ${count} catégorie(s) passeront dans « Autres ».`
-      : `Supprimer la famille « ${g.name} » ?`;
-    if (!confirm(msg)) return;
-    // détacher les catégories de cette famille
-    for (const c of state.categories.filter((c) => c.groupId === g.id)) {
-      c.groupId = null;
-      await put('categories', c);
-    }
-    await del('groups', g.id);
-    state.groups = state.groups.filter((x) => x.id !== g.id);
-    renderSettings();
-    toast('Famille supprimée');
+    renderBills();
+    toast('Supprimé');
   }
 
   /* ---------------- Réglages : catégories ---------------- */
   function renderSettings() {
     renderRecurrents();
-    renderGroups();
-    const wrap = $('#cat-grouped-list');
-    wrap.innerHTML = '';
-    groupCategories(state.categories).forEach(({ group, cats }) => {
-      const head = document.createElement('div');
-      head.className = 'cat-manage__h';
-      head.innerHTML = `<span>${group.icon || ''}</span> ${escapeHtml(group.name)}`;
-      wrap.appendChild(head);
-      const ul = document.createElement('ul');
-      ul.className = 'cat-manage__list';
-      cats.forEach((c) => {
+    ['expense', 'income'].forEach((type) => {
+      const ul = $(`#cat-list-${type}`);
+      ul.innerHTML = '';
+      state.categories.filter((c) => c.type === type).forEach((c) => {
         const li = document.createElement('li');
         li.className = 'cat-row';
         li.innerHTML = `
           <span class="cat-row__emoji">${c.icon}</span>
           <span class="cat-row__name">${escapeHtml(c.name)}</span>
-          ${c.type === 'income' ? '<span class="cat-row__tag">Revenu</span>' : ''}
           <button class="cat-row__btn edit" title="Modifier">✏️</button>
           <button class="cat-row__btn del" title="Supprimer">🗑️</button>`;
         li.querySelector('.edit').addEventListener('click', () => openCatModal(c));
         li.querySelector('.del').addEventListener('click', () => removeCategory(c));
         ul.appendChild(li);
       });
-      wrap.appendChild(ul);
     });
   }
 
-  function fillCatGroupSelect(selectedId) {
-    const sel = $('#cat-modal-group');
-    sel.innerHTML = '<option value="">— Aucune —</option>' +
-      [...state.groups].sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
-        .map((g) => `<option value="${g.id}">${g.icon || ''} ${escapeHtml(g.name)}</option>`).join('');
-    sel.value = selectedId || '';
-  }
-
-  function openCatModal(cat) {
+  function openCatModal(cat, presetType) {
     $('#cat-modal-id').value = cat ? cat.id : '';
     $('#cat-modal-name').value = cat ? cat.name : '';
     $('#cat-modal-icon').value = cat ? cat.icon : '';
-    $('#cat-modal-type').value = cat ? cat.type : 'expense';
+    $('#cat-modal-type').value = cat ? cat.type : (presetType || 'expense');
     $('#cat-modal-type').disabled = !!cat; // type non modifiable après coup
-    fillCatGroupSelect(cat ? cat.groupId : null);
     $('#cat-modal-title').textContent = cat ? 'Modifier la catégorie' : 'Nouvelle catégorie';
     $('#cat-modal').hidden = false;
   }
@@ -869,7 +838,6 @@
       type: $('#cat-modal-type').value,
       color: existing ? existing.color : PALETTE[state.categories.length % PALETTE.length],
       order: existing ? existing.order : (Math.max(0, ...state.categories.map((c) => c.order ?? 0)) + 1),
-      groupId: $('#cat-modal-group').value || null,
     };
     await put('categories', cat);
     if (existing) Object.assign(existing, cat);
@@ -913,18 +881,27 @@
       e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
     });
 
-    $('#add-cat-btn').addEventListener('click', () => openCatModal(null));
+    $('#add-cat-btn-expense').addEventListener('click', () => openCatModal(null, 'expense'));
+    $('#add-cat-btn-income').addEventListener('click', () => openCatModal(null, 'income'));
     $('#cat-modal-save').addEventListener('click', saveCatModal);
     $$('[data-close-modal]').forEach((b) => b.addEventListener('click', closeCatModal));
 
-    // familles (regroupement)
-    $('#add-group-btn').addEventListener('click', () => openGroupModal(null));
-    $('#group-modal-save').addEventListener('click', saveGroup);
-    $('#group-modal-remove').addEventListener('click', () => {
-      const g = groupById($('#group-modal-id').value);
-      if (g) { closeGroupModal(); removeGroup(g); }
+    // factures & abonnements (écran Budgets)
+    $('#add-bill-btn').addEventListener('click', () => openRecurModal(null, 'expense'));
+    $('#bills-list').addEventListener('click', (e) => {
+      const pay = e.target.closest('[data-bill-pay]');
+      const unpay = e.target.closest('[data-bill-unpay]');
+      const edit = e.target.closest('[data-bill-edit]');
+      if (pay) payBill(pay.dataset.billPay);
+      else if (unpay) unpayBill(unpay.dataset.billUnpay);
+      else if (edit) openRecurModal(recurrentById(edit.dataset.billEdit), 'expense');
     });
-    $$('[data-close-group]').forEach((b) => b.addEventListener('click', closeGroupModal));
+    $('#bills-list').addEventListener('input', (e) => {
+      if (e.target.matches('[data-bill-amount]')) {
+        const n = parseAmount(e.target.value);
+        e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+      }
+    });
 
     // budgets
     $('#budget-modal-save').addEventListener('click', saveBudget);
@@ -974,21 +951,6 @@
     }
     cats.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     state.categories = cats;
-
-    // Familles : seed si vide, puis migration des catégories sans famille
-    let groups = await getAll('groups');
-    if (!groups.length) {
-      groups = DEFAULT_GROUPS.map((g) => ({ ...g }));
-      for (const g of groups) await put('groups', g);
-    }
-    state.groups = groups;
-    for (const c of state.categories) {
-      if (c.groupId === undefined) {
-        c.groupId = DEFAULT_CAT_GROUP[c.name] || null;
-        await put('categories', c);
-      }
-    }
-
     state.operations = await getAll('operations');
     state.budgets = await getAll('budgets');
     state.recurrents = await getAll('recurrents');

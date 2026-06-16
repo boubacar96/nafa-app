@@ -176,21 +176,31 @@ button{font-family:inherit;cursor:pointer}
 .hist-total span{font-size:.84rem;color:var(--teal-dark);font-weight:700}
 .hist-total strong{font-size:1.15rem;font-weight:800;color:var(--teal-dark)}
 
-/* ---------- Réglages : familles ---------- */
-.group-list{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:7px}
-.group-row{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);
-  border-radius:14px;padding:10px 13px;box-shadow:var(--shadow-soft)}
-.group-row__emoji{font-size:1.2rem;width:34px;height:34px;display:grid;place-items:center;
-  border-radius:10px;background:var(--teal-soft);flex:0 0 auto}
-.group-row__main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.group-row__name{font-weight:700;font-size:.95rem}
-.group-row__meta{color:var(--muted);font-size:.78rem}
+/* ---------- Budgets : factures & abonnements ---------- */
+.bills-summary{background:linear-gradient(155deg,var(--teal-2) -10%,var(--teal) 60%);color:#fff;
+  border-radius:18px;padding:16px 18px;margin-bottom:14px;box-shadow:0 10px 26px rgba(11,59,51,.2)}
+.bills-summary__row{display:flex;align-items:baseline;justify-content:space-between}
+.bills-summary__row span{font-size:.84rem;opacity:.9}
+.bills-summary__row strong{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+.bills-summary__sub{font-size:.78rem;opacity:.82;margin-top:4px}
+.bills-list{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:10px}
+.bill{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:13px 15px;
+  box-shadow:var(--shadow-soft);border-left:4px solid var(--teal)}
+.bill--paid{border-left-color:var(--in);background:#f6fbf9}
+.bill__top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+.bill__id{background:none;border:none;padding:0;display:flex;align-items:center;gap:9px;min-width:0;
+  font-weight:800;font-size:.98rem;color:var(--ink);text-align:left}
+.bill__name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bill__day{font-size:.72rem;font-weight:700;color:var(--muted);background:#eef2f0;padding:3px 9px;border-radius:20px;flex:0 0 auto}
+.bill__badge{font-size:.72rem;font-weight:800;color:var(--in);background:#e1f5ee;padding:4px 10px;border-radius:20px;flex:0 0 auto}
+.bill__action{display:flex;gap:10px;align-items:stretch}
+.bill__pay{flex:0 0 auto;padding:12px 20px}
+.bill__paidrow{display:flex;align-items:center;justify-content:space-between}
+.bill__paidamt{font-weight:800;color:var(--in)}
+.bill__undo{background:none;border:none;color:var(--muted);font-size:.8rem;font-weight:600;text-decoration:underline;padding:4px}
 
 /* ---------- Réglages : catégories ---------- */
 .cat-manage{margin-bottom:18px}
-.cat-row__tag{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
-  color:var(--in);background:#e1f5ee;padding:3px 8px;border-radius:20px}
-.budget-sub__icon{margin-right:6px}
 .cat-manage__h{font-size:.82rem;color:var(--muted);margin:0 2px 9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
 .cat-manage__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
 .cat-row{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);
