@@ -181,9 +181,14 @@ button{font-family:inherit;cursor:pointer}
 }
 .amount-field__currency{color:var(--muted);font-weight:700;font-size:.92rem}
 .amount-field input{
-  border:none;outline:none;font-size:2.2rem;font-weight:800;width:100%;
+  border:none;outline:none;font-size:2.4rem;font-weight:800;width:100%;
   background:transparent;color:var(--ink);letter-spacing:-.02em;font-family:inherit;
 }
+/* couleur du montant + onglet actif selon le type */
+#screen-add[data-type="expense"] .amount-field input{color:var(--out)}
+#screen-add[data-type="income"] .amount-field input{color:var(--in)}
+.type-toggle__btn[data-type="expense"].is-active{color:var(--out)}
+.type-toggle__btn[data-type="income"].is-active{color:var(--in)}
 .field-label{font-size:.82rem;font-weight:700;color:var(--muted);margin:0 0 7px;display:block}
 .cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
 .cat-chip{
@@ -291,6 +296,13 @@ button{font-family:inherit;cursor:pointer}
 .bill__paidrow{display:flex;align-items:center;justify-content:space-between}
 .bill__paidamt{font-weight:800;color:var(--in)}
 .bill__undo{background:none;border:none;color:var(--muted);font-size:.8rem;font-weight:600;text-decoration:underline;padding:4px}
+
+/* ---------- Glisser-déposer (réordonner) ---------- */
+.drag-handle{background:none;border:none;color:var(--muted);padding:2px 4px;margin-left:-4px;
+  touch-action:none;cursor:grab;display:grid;place-items:center;flex:0 0 auto}
+.drag-handle:active{cursor:grabbing}
+.grip{width:18px;height:18px;fill:currentColor}
+.cat-row.dragging{opacity:.6;background:var(--surface-2);box-shadow:var(--shadow)}
 
 /* ---------- Réglages : catégories ---------- */
 .cat-manage{margin-bottom:18px}

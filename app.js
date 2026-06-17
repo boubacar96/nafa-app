@@ -627,6 +627,7 @@
 
   function setAddType(type) {
     state.addType = type;
+    $('#screen-add').dataset.type = type; // pour la couleur (dépense/revenu/transfert)
     $$('.type-toggle__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.type === type));
     const isTransfer = type === 'transfer';
     $('#add-cat-block').hidden = isTransfer;
@@ -667,6 +668,7 @@
     state.addAmount = '';
     $('#add-amount').value = '';
     $('#add-note').value = '';
+    $('#add-transfer-fees').value = '';
     $('#add-date').value = todayISO();
     $('#add-title').textContent = 'Ajouter';
     $('#add-save').textContent = 'Enregistrer';
@@ -680,6 +682,20 @@
   function parseAmount(str) {
     const n = parseInt(String(str).replace(/[^\d]/g, ''), 10);
     return isNaN(n) ? 0 : n;
+  }
+
+  // Catégorie "Frais" (créée à la volée pour les frais Mobile Money)
+  async function feeCategory() {
+    let c = state.categories.find((x) => x.type === 'expense' && x.name === 'Frais');
+    if (!c) {
+      c = {
+        id: uid(), name: 'Frais', icon: '🏧', color: '#888780', type: 'expense',
+        order: Math.max(0, ...state.categories.map((x) => x.order ?? 0)) + 1,
+      };
+      await put('categories', c);
+      state.categories.push(c);
+    }
+    return c;
   }
 
   // Pavé numérique de l'écran Ajouter
@@ -744,6 +760,18 @@
       };
       await put('operations', op);
       if (existing) Object.assign(existing, op); else state.operations.push(op);
+      // frais Mobile Money éventuels (dépense séparée sur le compte source)
+      const fees = parseAmount($('#add-transfer-fees').value);
+      if (fees > 0 && !existing) {
+        const fc = await feeCategory();
+        const feeOp = {
+          id: uid(), amount: fees, type: 'expense', categoryId: fc.id,
+          accountId: from, date: op.date, note: 'Frais Mobile Money',
+          createdAt: new Date().toISOString(),
+        };
+        await put('operations', feeOp);
+        state.operations.push(feeOp);
+      }
       toast('Transfert enregistré ✓');
       resetAddForm();
       return goto('home');
@@ -1319,7 +1347,9 @@
     state.accounts.forEach((a) => {
       const li = document.createElement('li');
       li.className = 'cat-row';
+      li.dataset.id = a.id;
       li.innerHTML = `
+        <button class="drag-handle" aria-label="Déplacer">${gripSVG}</button>
         <span class="cat-row__emoji">${a.icon}</span>
         <span class="recur-row__main">
           <span class="recur-row__label">${escapeHtml(a.name)}</span>
@@ -1331,6 +1361,7 @@
       li.querySelector('.del').addEventListener('click', () => removeAccount(a));
       ul.appendChild(li);
     });
+    makeSortable(ul, reorderAccounts);
   }
 
   function openAccountModal(a) {
@@ -1393,6 +1424,61 @@
     const p = $('#pin-switch'); if (p) p.classList.toggle('is-on', hasPin());
   }
 
+  // Rend une liste <ul> réordonnable par glisser-déposer (souris + tactile)
+  function makeSortable(ul, onReorder) {
+    if (ul.dataset.sortable === '1') return; // déléguée : on l'attache une seule fois
+    ul.dataset.sortable = '1';
+    let dragging = null;
+    const after = (y) => {
+      const els = [...ul.querySelectorAll('li:not(.dragging)')];
+      let best = null, bestOff = -Infinity;
+      els.forEach((el) => {
+        const box = el.getBoundingClientRect();
+        const off = y - box.top - box.height / 2;
+        if (off < 0 && off > bestOff) { bestOff = off; best = el; }
+      });
+      return best;
+    };
+    const onMove = (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const el = after(e.clientY);
+      if (el == null) ul.appendChild(dragging);
+      else if (el !== dragging) ul.insertBefore(dragging, el);
+    };
+    const onUp = () => {
+      if (!dragging) return;
+      dragging.classList.remove('dragging');
+      dragging = null;
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      onReorder([...ul.children].map((li) => li.dataset.id).filter(Boolean));
+    };
+    ul.addEventListener('pointerdown', (e) => {
+      const h = e.target.closest('.drag-handle');
+      if (!h) return;
+      e.preventDefault();
+      dragging = h.closest('li');
+      if (!dragging) return;
+      dragging.classList.add('dragging');
+      document.addEventListener('pointermove', onMove, { passive: false });
+      document.addEventListener('pointerup', onUp);
+    });
+  }
+
+  const gripSVG = '<svg class="grip" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+
+  async function reorderCategories(ids) {
+    ids.forEach((id, i) => { const c = catById(id); if (c) c.order = i; });
+    for (const id of ids) { const c = catById(id); if (c) await put('categories', c); }
+    state.categories.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  }
+  async function reorderAccounts(ids) {
+    ids.forEach((id, i) => { const a = accountById(id); if (a) a.order = i; });
+    for (const id of ids) { const a = accountById(id); if (a) await put('accounts', a); }
+    state.accounts.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  }
+
   // Sous-écran Catégories
   function renderCategoriesScreen() {
     ['expense', 'income'].forEach((type) => {
@@ -1402,7 +1488,9 @@
       state.categories.filter((c) => c.type === type).forEach((c) => {
         const li = document.createElement('li');
         li.className = 'cat-row';
+        li.dataset.id = c.id;
         li.innerHTML = `
+          <button class="drag-handle" aria-label="Déplacer">${gripSVG}</button>
           <span class="cat-row__emoji">${c.icon}</span>
           <span class="cat-row__name">${escapeHtml(c.name)}</span>
           <button class="cat-row__btn edit" title="Modifier">✏️</button>
@@ -1411,6 +1499,7 @@
         li.querySelector('.del').addEventListener('click', () => removeCategory(c));
         ul.appendChild(li);
       });
+      makeSortable(ul, reorderCategories);
     });
   }
 
@@ -1487,6 +1576,10 @@
     $('#add-keypad').addEventListener('click', (e) => {
       const b = e.target.closest('[data-key]');
       if (b) keypadPress(b.dataset.key);
+    });
+    $('#add-transfer-fees').addEventListener('input', (e) => {
+      const n = parseAmount(e.target.value);
+      e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
     });
     $('#add-form').addEventListener('submit', saveOperation);
     $('#add-delete').addEventListener('click', deleteOperation);
