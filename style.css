@@ -547,6 +547,19 @@ button{font-family:inherit;cursor:pointer}
 .shake{animation:shake .4s}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 
+/* ---------- Transitions & fluidité (effet app native) ---------- */
+.screen--in{animation:screenIn .28s cubic-bezier(.22,.7,.3,1)}
+@keyframes screenIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){ .screen--in{animation:none} }
+/* retour visuel au tap, partout */
+.btn:active,.set-row--nav:active,.op:active,.acc-card:active,.cat-chip:active,.acc-pill:active,
+.bill:active,.bgt.tappable:active,.budget-add-row.tappable:active,.goal-card--tap:active,
+.keypad__key:active,.month-nav__btn:active,.back-btn:active,.fab:active,.tabbar__btn:active{
+  transform:scale(.97);
+}
+.btn,.set-row--nav,.op,.cat-chip,.acc-pill,.bill,.goal-card--tap,.keypad__key,
+.month-nav__btn,.back-btn,.fab,.tabbar__btn{transition:transform .09s ease, background-color .15s ease}
+
 /* ---------- Polish v3 (coloré & vivant) ---------- */
 .section-head h2{position:relative;padding-left:13px}
 .section-head h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);

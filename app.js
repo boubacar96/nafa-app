@@ -242,6 +242,9 @@
   function goto(screen) {
     state.viewMonth = currentMonthKey(); // on repart toujours du mois courant
     $$('.screen').forEach((s) => { s.hidden = s.dataset.screen !== screen; });
+    // petite transition d'apparition (effet "app native")
+    const shown = $(`[data-screen="${screen}"]`);
+    if (shown) { shown.classList.remove('screen--in'); void shown.offsetWidth; shown.classList.add('screen--in'); }
     const tab = SCREEN_TAB[screen] || screen;
     $$('.tabbar__btn').forEach((b) => b.classList.toggle('is-active', b.dataset.goto === tab));
     window.scrollTo(0, 0);
@@ -1096,7 +1099,7 @@
 
     if (!bills.length) {
       summary.hidden = true;
-      list.innerHTML = '<li class="hint" style="margin:0 2px">Aucune facture ni abonnement. Ajoute Internet, SENELEC/WOYOFAL, loyer, gardiennage…</li>';
+      list.innerHTML = '<li class="hint" style="margin:0 2px">Aucune facture. Appuie sur + pour en ajouter.</li>';
       return;
     }
 
@@ -1182,7 +1185,7 @@
     const ul = $('#recur-list');
     ul.innerHTML = '';
     if (!state.recurrents.length) {
-      ul.innerHTML = '<li class="hint" style="margin:0 2px">Aucune récurrence. Ajoute ton loyer, ton salaire, tes abonnements…</li>';
+      ul.innerHTML = '<li class="hint" style="margin:0 2px">Rien pour l\'instant. Appuie sur + pour ajouter.</li>';
       return;
     }
     [...state.recurrents]
