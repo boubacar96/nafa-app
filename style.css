@@ -9,10 +9,10 @@
   --in:#10b888;        /* revenu */
   --out:#f0566b;       /* dépense */
   --warn:#f5a524;
-  /* dégradés vifs */
-  --grad-primary:linear-gradient(135deg,#16c39a 0%,#1dc4e9 100%);
-  --grad-hero:linear-gradient(145deg,#16c79c 0%,#11a7c4 52%,#5b73e8 125%);
-  --grad-warm:linear-gradient(135deg,#ffb347,#ff7a8a);
+  /* couleurs unies (look épuré, plat) */
+  --grad-primary:#0e9e7a;
+  --grad-hero:#0f6e56;
+  --grad-warm:#e98a3a;
   /* surfaces — thème clair */
   --ink:#10211c;
   --muted:#6f8079;
@@ -322,6 +322,24 @@ button{font-family:inherit;cursor:pointer}
 .acc-pill span{font-size:1rem}
 .acc-pill.is-active{border-color:var(--teal);background:var(--teal-soft);box-shadow:0 0 0 2px var(--teal-soft)}
 
+/* ---------- Raccourcis de saisie (accueil) ---------- */
+.home-quickadd{margin-bottom:18px}
+.quickadd{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.quickadd__btn{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--card);
+  border:1px solid var(--line);border-radius:15px;padding:11px 4px;font-family:inherit;color:var(--ink);
+  box-shadow:var(--shadow-soft)}
+.quickadd__emoji{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;font-size:1.35rem}
+.quickadd__name{font-size:.68rem;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- Écran de bienvenue ---------- */
+.onb{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;padding:26px;overflow-y:auto}
+.onb[hidden]{display:none}
+.onb__inner{width:100%;max-width:340px;display:flex;flex-direction:column;gap:13px}
+.onb__logo{width:58px;height:58px;border-radius:18px;font-size:1.6rem;align-self:flex-start}
+.onb__title{font-size:1.55rem;font-weight:800}
+.onb__sub{color:var(--muted);margin:0 0 4px;line-height:1.45}
+.onb__note{color:var(--muted);font-size:.82rem;line-height:1.45;margin:2px 0 8px}
+
 /* ---------- Insight comparaison (accueil) ---------- */
 .home-insight{border-radius:16px;padding:13px 16px;font-size:.86rem;font-weight:600;margin-bottom:16px;line-height:1.35;border:1px solid transparent}
 .insight--good{background:var(--soft-in);color:var(--in)}
@@ -454,8 +472,7 @@ button{font-family:inherit;cursor:pointer}
   color:var(--muted);font-size:.66rem;font-weight:700;padding:6px 4px;flex:1;transition:color .15s;
 }
 .tabbar__btn.is-active{color:var(--teal)}
-.tabbar__icon{font-size:1.3rem;line-height:1;filter:grayscale(.2)}
-.tabbar__btn.is-active .tabbar__icon{filter:none}
+.tabbar__svg{width:25px;height:25px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 
 /* FAB centré : élément du milieu, flotte au-dessus de la barre */
 .fab{
@@ -466,6 +483,7 @@ button{font-family:inherit;cursor:pointer}
 }
 .fab:active{transform:scale(.93)}
 .fab__plus{font-size:2.1rem;font-weight:300;line-height:1;margin-top:-2px}
+.fab__svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round}
 
 /* ---------- Modale ---------- */
 .modal{position:fixed;inset:0;z-index:50;display:grid;place-items:end center}
@@ -569,7 +587,22 @@ button{font-family:inherit;cursor:pointer}
 .tabbar,.cat-chip,.acc-pill{transition:background-color .25s ease,border-color .25s ease,color .25s ease}
 .op__icon,.cat-chip__emoji,.acc-card__icon,.bgt__emoji,.brand-badge{box-shadow:0 2px 8px rgba(0,0,0,.04)}
 
-/* ---------- Desktop ---------- */
+/* ---------- Desktop : cadre de téléphone ---------- */
 @media(min-width:600px){
-  body{padding-top:14px}
+  body{
+    background:#0c1714;
+    min-height:100vh;
+  }
+  #app{
+    background:
+      radial-gradient(130% 70% at 50% -12%, var(--bg-tint) 0%, var(--bg) 48%) no-repeat,
+      var(--bg);
+    max-width:412px;
+    min-height:100vh;
+    border-radius:0 0 44px 44px;
+    box-shadow:0 30px 90px rgba(0,0,0,.5);
+    padding-top:22px;
+  }
+  [data-theme="dark"] body{background:#05100c}
+  .tabbar{bottom:18px}
 }

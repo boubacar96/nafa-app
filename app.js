@@ -276,7 +276,8 @@
     const isCurrent = mk === currentMonthKey();
     $('#home-month').textContent = monthLabel(mk);
     $('#home-month-next').disabled = isCurrent;
-    $('#home-kicker').textContent = isCurrent ? 'Bonjour 👋' : 'Mois passé';
+    let name = ''; try { name = localStorage.getItem('nafa-name') || ''; } catch {}
+    $('#home-kicker').textContent = isCurrent ? ('Bonjour' + (name ? ' ' + name : '') + ' 👋') : 'Mois passé';
 
     const ops = state.operations.filter((o) => monthKey(o.date) === mk);
     const revenus = ops.filter((o) => o.type === 'income').reduce((s, o) => s + o.amount, 0);
@@ -289,6 +290,7 @@
     $('#home-saving').textContent = fmt(Math.max(solde, 0));
 
     renderHomeAccounts(); // soldes des comptes = toujours actuels (toutes périodes)
+    if (isCurrent) renderHomeQuickAdd(); else $('#home-quickadd').hidden = true;
     renderHomeGoal();
 
     // Sections "mois en cours" uniquement (alertes, à confirmer, comparaison)
@@ -309,6 +311,38 @@
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt))
       .slice(0, 6);
     renderOpList($('#home-recent'), recent, false);
+  }
+
+  // Raccourcis de saisie : les catégories de dépense les plus utilisées
+  function frequentExpenseCats(n) {
+    const count = {};
+    state.operations.forEach((o) => {
+      if (o.type === 'expense' && o.categoryId) count[o.categoryId] = (count[o.categoryId] || 0) + 1;
+    });
+    return state.categories
+      .filter((c) => c.type === 'expense')
+      .map((c) => ({ c, n: count[c.id] || 0 }))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, n)
+      .map((x) => x.c);
+  }
+  function renderHomeQuickAdd() {
+    const wrap = $('#home-quickadd');
+    if (!wrap) return;
+    const cats = frequentExpenseCats(4);
+    if (!cats.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    wrap.innerHTML = '<div class="quickadd">' + cats.map((c) =>
+      `<button class="quickadd__btn" data-quickcat="${c.id}">
+        <span class="quickadd__emoji" style="background:${c.color}1f">${c.icon}</span>
+        <span class="quickadd__name">${escapeHtml(c.name)}</span>
+      </button>`).join('') + '</div>';
+  }
+  function quickAdd(catId) {
+    goto('add');
+    state.addCatId = catId;
+    renderCatGrid();
+    setTimeout(() => { const a = $('#add-amount'); if (a) a.scrollIntoView({ block: 'center' }); }, 50);
   }
 
   // "Mes comptes" : solde de chaque compte (espèces, Wave, Orange Money, banque)
@@ -1489,6 +1523,13 @@
     });
     $('#install-btn').addEventListener('click', installApp);
 
+    // écran de bienvenue
+    $('#onb-start').addEventListener('click', finishOnboarding);
+    $('#onb-salary').addEventListener('input', (e) => {
+      const n = parseAmount(e.target.value);
+      e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+    });
+
     // thème clair / sombre (interrupteur)
     $('#theme-switch').addEventListener('click', () => applyTheme(getTheme() === 'dark' ? 'light' : 'dark'));
 
@@ -1548,6 +1589,12 @@
     $('#recur-modal-amount').addEventListener('input', (e) => {
       const n = parseAmount(e.target.value);
       e.target.value = n ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : '';
+    });
+
+    // raccourcis de saisie (accueil)
+    $('#home-quickadd').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-quickcat]');
+      if (b) quickAdd(b.dataset.quickcat);
     });
 
     // carte "à confirmer" (délégation)
@@ -1697,6 +1744,35 @@
     }
   }
 
+  /* ---------------- Écran de bienvenue (1er lancement) ---------------- */
+  function needsOnboarding() {
+    try { if (localStorage.getItem('nafa-onboarded')) return false; } catch {}
+    return state.operations.length === 0;
+  }
+  function showOnboarding() { $('#onboarding').hidden = false; }
+  async function finishOnboarding() {
+    const name = $('#onb-name').value.trim();
+    const salary = parseAmount($('#onb-salary').value);
+    try {
+      if (name) localStorage.setItem('nafa-name', name);
+      localStorage.setItem('nafa-onboarded', '1');
+    } catch {}
+    if (salary > 0) {
+      const salCat = state.categories.find((c) => c.name === 'Salaire' && c.type === 'income');
+      const rec = {
+        id: uid(), label: 'Salaire', amount: salary, day: 30,
+        type: 'income',
+        categoryId: salCat ? salCat.id : (state.categories.find((c) => c.type === 'income') || {}).id,
+        accountId: state.accounts[0] && state.accounts[0].id,
+        active: true, posted: [], payments: {},
+      };
+      await put('recurrents', rec);
+      state.recurrents.push(rec);
+    }
+    $('#onboarding').hidden = true;
+    goto('home');
+  }
+
   /* ---------------- Démarrage ---------------- */
   async function init() {
     db = await openDB();
@@ -1739,6 +1815,7 @@
     wire();
     applyTheme(getTheme());
     if (hasPin()) showLock();
+    if (needsOnboarding()) showOnboarding();
     goto('home');
 
     if ('serviceWorker' in navigator) {

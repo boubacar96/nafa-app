@@ -58,6 +58,8 @@
         </div>
       </div>
 
+      <div class="home-quickadd" id="home-quickadd" hidden></div>
+
       <div class="home-accounts" id="home-accounts" hidden>
         <div class="section-head">
           <h2>Mes comptes</h2>
@@ -363,19 +365,19 @@
   <!-- ====================== Barre de navigation ====================== -->
   <nav class="tabbar">
     <button class="tabbar__btn is-active" data-goto="home">
-      <span class="tabbar__icon">🏠</span><span>Accueil</span>
+      <svg class="tabbar__svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg><span>Accueil</span>
     </button>
     <button class="tabbar__btn" data-goto="history">
-      <span class="tabbar__icon">📜</span><span>Historique</span>
+      <svg class="tabbar__svg" viewBox="0 0 24 24" aria-hidden="true"><line x1="8" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="8" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Historique</span>
     </button>
     <button class="fab" data-goto="add" id="fab" aria-label="Ajouter">
-      <span class="fab__plus">+</span>
+      <svg class="fab__svg" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
     <button class="tabbar__btn" data-goto="budgets">
-      <span class="tabbar__icon">📊</span><span>Budgets</span>
+      <svg class="tabbar__svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9v9z"/><path d="M21 12a9 9 0 0 0-9-9"/></svg><span>Budgets</span>
     </button>
     <button class="tabbar__btn" data-goto="settings">
-      <span class="tabbar__icon">⚙️</span><span>Réglages</span>
+      <svg class="tabbar__svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L16.2 3h-4l-.4 2.5a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.5h4l.4-2.5a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5A7 7 0 0 0 19 12Z"/></svg><span>Réglages</span>
     </button>
   </nav>
 
@@ -543,6 +545,25 @@
         <button type="button" class="btn btn--ghost" data-close-pin>Annuler</button>
         <button type="button" class="btn btn--primary" id="pin-modal-save">Activer</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ====================== Écran de bienvenue ====================== -->
+  <div class="onb" id="onboarding" hidden>
+    <div class="onb__inner">
+      <span class="brand-badge onb__logo">N</span>
+      <h2 class="onb__title">Bienvenue sur Nafa 👋</h2>
+      <p class="onb__sub">Ton argent, clair et privé. Deux infos pour bien démarrer (optionnel).</p>
+      <label class="field">
+        <span class="field-label">Ton prénom</span>
+        <input type="text" id="onb-name" maxlength="20" placeholder="ex. Modou" />
+      </label>
+      <label class="field">
+        <span class="field-label">Ton salaire mensuel (FCFA)</span>
+        <input id="onb-salary" inputmode="numeric" pattern="[0-9 ]*" placeholder="ex. 350 000" />
+      </label>
+      <p class="onb__note">Tes comptes (Espèces, Wave, Orange Money, Banque) sont déjà prêts — tu pourras tout ajuster dans les Réglages.</p>
+      <button class="btn btn--primary full" id="onb-start">Commencer</button>
     </div>
   </div>
 
